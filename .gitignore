@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════
+# COFFEE MANAGER — .gitignore
+# ═══════════════════════════════════════
+
+# ── Node modules ──
+**/node_modules/
+
+# ── Build artifacts ──
+**/dist/
+**/.vite/
+
+# ── Environment files (NEVER commit) ──
+**/.env
+**/.env.local
+**/.env.development
+**/.env.production
+**/.env.*.local
+
+# ── Editor & OS ──
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── Logs ──
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── OS files ──
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# ── Backend specific ──
+backend/public/images/products/*.jpg
+backend/public/images/products/*.png
+backend/public/images/products/*.jpeg
+backend/public/images/products/*.webp
+!backend/public/images/.gitkeep
+
+# ── Frontend specific ──
+src/App.css
+src/logo.svg
+*.tsbuildinfo
+
+# ── Claude settings (optional, uncomment if desired) ──
+# .claude/

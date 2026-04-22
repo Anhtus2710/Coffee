@@ -4,8 +4,8 @@ const { getTables, createTable, updateTable, updateTableStatus, deleteTable } = 
 const { protect, authorize } = require('../middleware/auth');
 
 router.get('/', protect, getTables);
-router.post('/', protect, authorize('admin', 'manager'), createTable);
-router.put('/:id', protect, authorize('admin', 'manager'), updateTable);
+router.post('/', protect, authorize('admin'), createTable);
+router.put('/:id', protect, authorize('admin'), updateTable);
 router.patch('/:id/status', protect, updateTableStatus);
 router.delete('/:id', protect, authorize('admin'), deleteTable);
 

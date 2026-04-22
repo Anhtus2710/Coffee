@@ -54,10 +54,10 @@ exports.toggleStatus = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-// @route DELETE /api/staff/:id
+// @route DELETE /api/staff/:id — soft delete
 exports.deleteStaff = async (req, res, next) => {
   try {
-    const staff = await User.findByIdAndDelete(req.params.id);
+    const staff = await User.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
     if (!staff) return res.status(404).json({ success: false, message: 'Không tìm thấy nhân viên' });
     res.json({ success: true, message: 'Đã xóa nhân viên' });
   } catch (error) { next(error); }

@@ -11,7 +11,13 @@ exports.createCategory = async (req, res, next) => {
   try {
     const category = await Category.create(req.body);
     res.status(201).json({ success: true, data: category });
-  } catch (error) { next(error); }
+  } catch (error) {
+    // Handle duplicate slug
+    if (error.code === 11000 && error.keyPattern.slug) {
+      return res.status(400).json({ success: false, message: 'Danh mục này đã tồn tại' });
+    }
+    next(error);
+  }
 };
 
 exports.updateCategory = async (req, res, next) => {

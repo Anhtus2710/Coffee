@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(node -e \"const fs=require\\('fs'\\); const c=fs.readFileSync\\('src/pages/POSPage.jsx','utf8'\\); const line712=c.split\\('\\\\n'\\)[711]; console.log\\('Line 712 length:', line712.length\\); console.log\\('Chars 140-150:', JSON.stringify\\(line712.slice\\(139,149\\)\\)\\); const opens=line712.split\\(''\\).filter\\(ch=>ch==='\\('\\).length; const closes=line712.split\\(''\\).filter\\(ch=>ch==='\\)'\\).length; console.log\\('Opens:',opens,'Closes:',closes\\);\")"
+    ]
+  }
+}

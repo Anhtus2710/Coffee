@@ -4,7 +4,111 @@ Hệ thống quản lý quán cà phê toàn diện xây dựng với **MongoDB,
 
 ---
 
-## 🗂 Cấu trúc dự án
+## � Cài đặt và Chạy
+
+### Yêu cầu hệ thống
+- Node.js v16+
+- MongoDB
+- npm hoặc yarn
+
+### 1. Clone và cài đặt dependencies
+
+```bash
+git clone <repository-url>
+cd coffee-shop
+
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
+npm install
+```
+
+### 2. Cấu hình môi trường
+
+#### Backend (.env)
+```bash
+cp .env.example .env
+# Chỉnh sửa các biến môi trường trong .env
+```
+
+#### Frontend (.env)
+```bash
+# Tạo file .env trong thư mục frontend
+echo "VITE_API_URL=http://localhost:5000" > .env
+```
+
+### 3. Khởi động MongoDB
+```bash
+# Đảm bảo MongoDB đang chạy trên localhost:27017
+mongod
+```
+
+### 4. Chạy ứng dụng
+
+#### Terminal 1 - Backend:
+```bash
+cd backend
+npm run dev
+# Server sẽ chạy trên http://localhost:5000 (hoặc port khác nếu 5000 bị chiếm)
+```
+
+#### Terminal 2 - Frontend:
+```bash
+cd frontend
+npm run dev
+# Ứng dụng sẽ chạy trên http://localhost:5173
+```
+
+### 5. Seed dữ liệu mẫu
+```bash
+cd backend
+node utils/seed.js
+```
+
+---
+
+## 🔧 Xử lý lỗi Port bị chiếm
+
+Nếu gặp lỗi `EADDRINUSE` (port đã bị sử dụng):
+
+### Tự động tìm port trống
+Backend sẽ tự động tìm port trống bắt đầu từ 5000.
+
+### Thay đổi port thủ công
+1. **Backend**: Chỉnh sửa file `backend/.env`
+   ```
+   PORT=5001
+   ```
+
+2. **Frontend**: Chỉnh sửa file `frontend/.env`
+   ```
+   VITE_API_URL=http://localhost:5001
+   ```
+
+### Kiểm tra port đang sử dụng
+```bash
+# Windows
+netstat -ano | findstr :5000
+
+# Linux/Mac
+lsof -i :5000
+```
+
+### Giải phóng port
+```bash
+# Windows - thay PID bằng số từ netstat
+taskkill /PID <PID> /F
+
+# Linux/Mac
+kill -9 <PID>
+```
+
+---
+
+## �🗂 Cấu trúc dự án
 
 ```
 coffee-shop/
@@ -89,10 +193,8 @@ Mở trình duyệt: **http://localhost:5173**
 | Email | Mật khẩu | Vai trò |
 |-------|----------|---------|
 | admin@coffee.com | 123456 | Admin |
-| manager@coffee.com | 123456 | Quản lý |
 | barista@coffee.com | 123456 | Pha chế |
-| waiter@coffee.com | 123456 | Phục vụ |
-| cashier@coffee.com | 123456 | Thu ngân |
+| waiter@coffee.com | 123456 | Bồi bàn |
 
 ---
 
@@ -147,7 +249,7 @@ Mở trình duyệt: **http://localhost:5173**
 - **Đơn hàng**: Tạo đơn (3 bước), cập nhật trạng thái, lọc theo ngày
 - **Bàn**: Sơ đồ bàn theo khu vực, đổi trạng thái, xem đơn hiện tại
 - **Nhân viên**: CRUD, phân quyền, thống kê theo vai trò
-- **JWT Auth**: Bảo vệ route theo vai trò (admin/manager/barista/waiter/cashier)
+- **JWT Auth**: Bảo vệ route theo vai trò (admin/barista/waiter)
 
 ---
 

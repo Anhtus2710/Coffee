@@ -38,10 +38,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isAdmin = user?.role === 'admin';
-  const isManager = ['admin', 'manager'].includes(user?.role);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin, isManager }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin }}>
       {children}
     </AuthContext.Provider>
   );

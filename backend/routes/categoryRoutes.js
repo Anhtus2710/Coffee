@@ -4,8 +4,8 @@ const { getCategories, createCategory, updateCategory, deleteCategory } = requir
 const { protect, authorize } = require('../middleware/auth');
 
 router.get('/', protect, getCategories);
-router.post('/', protect, authorize('admin', 'manager'), createCategory);
-router.put('/:id', protect, authorize('admin', 'manager'), updateCategory);
+router.post('/', protect, authorize('admin'), createCategory);
+router.put('/:id', protect, authorize('admin'), updateCategory);
 router.delete('/:id', protect, authorize('admin'), deleteCategory);
 
 module.exports = router;

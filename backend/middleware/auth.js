@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+const ADMIN_ROLES = ['admin'];
+
 exports.protect = async (req, res, next) => {
   let token;
 
@@ -26,7 +28,12 @@ exports.protect = async (req, res, next) => {
 
 exports.authorize = (...roles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    const userRole = req.user.role;
+    const effectiveRoles = [userRole];
+    if (ADMIN_ROLES.includes(userRole) && !effectiveRoles.includes('admin')) {
+      effectiveRoles.push('admin');
+    }
+    if (!roles.some(role => effectiveRoles.includes(role))) {
       return res.status(403).json({
         success: false,
         message: `Vai trò "${req.user.role}" không có quyền thực hiện thao tác này`
