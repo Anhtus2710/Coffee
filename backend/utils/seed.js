@@ -473,33 +473,6 @@ const seed = async () => {
       preparationTime: 5,
     },
   ]);
-
-  // Create image files using product IDs - with visible placeholder
-  const imgDir = path.join(__dirname, "../public/images/products");
-  if (!fs.existsSync(imgDir)) {
-    fs.mkdirSync(imgDir, { recursive: true });
-  }
-  
-  // Generate a simple PNG placeholder (200x200 beige/tan color)
-  for (const product of products) {
-    const filename = `${product._id}.png`;
-    const imagePath = path.join(imgDir, filename);
-    
-    // Create a 200x200 PNG - beige color for coffee theme
-    // Base64 of a proper 200x200 PNG with tan/beige color
-    const placeholderBase64 = "iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAAAXNSR0IArs4c6QAAD+NJREFUeF7t3cFu2zAMhmFRWIYdMRyzIj1sB6wnbBhsKI4rLhxsSzCMHVAU7yh5hCQycJDRKFGiRFJi1c+8IBDFeUkFkrRkU5Ze67Tpua7bvu/7ruu6/M/1ej1/Pp/NxWIxmw+Hwy+VSmU+Go0+V6vVz7e3t++Ox+PLy/H4/Bl4//39jb+/f7Hf72MymfBzGo+HAMAwDC4uLtCvGo0GhkMh5NfW1ohhlpeXv5ydnZ2dxWIxvtRsNmM+q9XqfLFYYDQafVFV9dPpdDIxTfO0Xq9/qKpKkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiRJkiTpz1QqFXzzBVdWVr5ksRRFmbS7HQ6HfC0BKpVKPp/PGQ8GA8znbrcbgsEgwxEMBhGsVCqpVMqZTCaRTC7wv7JymtXVVbxhGAzGw+EQb1gslsRh2O12GMYZ+xaLBYPxdDqlsXg8ZjAMw2AwnE6nmsxgmqb0go+fwxfNZpPBMAxDTaYEXqfTwe9wOBxqMt1uN34nYDabqcoEhqEwTVMZpJJsNhs6hYqiqqogCzZNQ+fwer0qKoMoioLXweu2268AHsSwpxN4PB4VGb+fzysrK0SpIWw2G7q/w4TAj1yt9KqZwel0UqI8KUYzDEOrv7i0efRc3e12+K3pdIq/VRSFIgGpqhLMYrGQRWIyGo1wU+j+DEQAcTqdKjIAQ7+3SvLm94MBiqIowSyXS0tH7Pv7O1yS7+9vKJJCozVaTCYT8aMlsD1uKMaIlk72UpxW3xNfKnpz+zn0bpV4bNBVMr5Fz5bI7nqA1sxjqSn1BqH1vRjlTW1Zr5UqvVf4bXCHjHiKA2LgFyNPeBlEBAMq4Bci0AgLxfXbkGAED+LD5YXQMAIBGsJEQlkC0AAVAC2QIAD0Q1GAA85IVNwg3+8wNdMdQQtgbZjJSP0qHc2P8FMmK1vOMHPYVkzEPcLPqeB6JuVTYl8L86LwGQveFBB6F04dxmVH9dDcvbXQqF3LJ32HU/XZM4VfwvyoEPJ/YGF5xXlPFYawdEhxNGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxRFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxRFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVRcAlMGSDFUXAJTBkgxVFwCUwZIMVR/PdtNn4CAAD//2QBXw==";
-    const placeholderBuffer = Buffer.from(placeholderBase64, 'base64');
-    
-    fs.writeFileSync(imagePath, placeholderBuffer);
-
-    // Update product with image filename
-    await Product.findByIdAndUpdate(product._id, {
-      image: filename,
-    });
-  }
-
-  console.log("✅ Products seeded with images");
-
   // Tables
   const tableData = [];
   for (let i = 1; i <= 8; i++)

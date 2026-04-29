@@ -30,15 +30,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Ensure image directories exist
-const imagesDir = path.join(__dirname, 'public/images');
-const productImagesDir = path.join(imagesDir, 'products');
-if (!fs.existsSync(productImagesDir)) {
-  fs.mkdirSync(productImagesDir, { recursive: true });
-}
-
-// ✅ Chỉ cần 1 dòng static này là đủ (xóa các dòng trùng lặp)
-app.use('/images', express.static(imagesDir));
+// Images are now hosted on Cloudinary, no local static file serving needed for products
 
 // Routes
 app.use('/api/auth',       require('./routes/authRoutes'));
