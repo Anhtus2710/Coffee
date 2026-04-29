@@ -12,16 +12,28 @@ const {
 const { protect, authorize } = require("../middleware/auth");
 
 router.get("/", protect, getOrders);
+router.get("/barista/history", protect, authorize('barista', 'admin'), async (req, res, next) => {
+  try {
+    const orders = await Order.find({
+      status: { $in: ['ready', 'served'] },
+    }).sort({ updatedAt: -1 }).limit(50);
+    res.json({ success: true, data: orders });
+  } catch (err) { next(err); }
+});
+router.get('/barista', protect, authorize('barista', 'admin'), async (req, res, next) => {
+  try {
+    const orders = await Order.find({
+      status: { $in: ['pending', 'confirmed', 'preparing'] },
+    }).sort({ createdAt: -1 });
+    res.json({ success: true, data: orders });
+  } catch (err) { next(err); }
+});
 router.get("/:id", protect, getOrder);
+
 router.post("/", protect, createOrder);
 router.patch("/:id/status", protect, updateOrderStatus);
 router.patch("/:id/add-items", protect, addItems);
-router.delete(
-  "/:id",
-  protect,
-  authorize("admin", "waiter"),
-  cancelOrder,
-);
+router.delete("/:id", protect, authorize("admin", "waiter", "server"), cancelOrder);
 
 // Get orders by table ID
 router.get("/table/:tableId", protect, async (req, res, next) => {
@@ -40,24 +52,6 @@ router.get("/table/:tableId", protect, async (req, res, next) => {
   }
 });
 
-router.get('/barista', protect, authorize('barista', 'admin'), async (req, res, next) => {
-  try {
-    const orders = await Order.find({
-      status: { $in: ['pending', 'confirmed', 'preparing'] },
-    }).sort({ createdAt: -1 });
-    res.json({ success: true, data: orders });
-  } catch (err) { next(err); }
-});
-
-router.get('/barista/history', protect, authorize('barista', 'admin'), async (req, res, next) => {
-  try {
-    const orders = await Order.find({
-      status: { $in: ['ready', 'served'] },
-    }).sort({ updatedAt: -1 }).limit(50);
-    res.json({ success: true, data: orders });
-  } catch (err) { next(err); }
-});
-
 router.put('/item/:orderId/:itemId', protect, authorize('barista', 'admin'), async (req, res) => {
   try {
     const { status } = req.body;
@@ -67,6 +61,17 @@ router.put('/item/:orderId/:itemId', protect, authorize('barista', 'admin'), asy
     const item = order.items.id(req.params.itemId);
     if (!item) return res.status(404).json({ success: false, message: 'Không tìm thấy món trong đơn hàng' });
     item.status = status;
+
+    // Tự động cập nhật trạng thái của Order
+    // Nếu tất cả các món trong đơn đã xong ('ready' hoặc 'served'), chuyển đơn thành 'served' (đã phục vụ)
+    // Nếu chưa xong hết, chuyển đơn thành 'preparing' (nếu đơn đang ở trạng thái pending/confirmed)
+    const allItemsDone = order.items.every(i => ['ready', 'served'].includes(i.status));
+    
+    if (allItemsDone) {
+      order.status = 'served';
+    } else if (['pending', 'confirmed'].includes(order.status)) {
+      order.status = 'preparing';
+    }
 
     await order.save();
     res.json(order);

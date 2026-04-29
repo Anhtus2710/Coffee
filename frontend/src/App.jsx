@@ -3,9 +3,11 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Layout from './components/layout/Layout';
 import LoginPage from './pages/LoginPage';
-import AdminPage from './pages/AdminPage';
+import DashboardPage from './pages/DashboardPage';
+import OrdersPage from './pages/OrdersPage';
 import ServingPage from './pages/ServingPage';
 import PreparingPage from './pages/PreparingPage';
+import MenuPage from './pages/MenuPage';
 
 const ProtectedRoute = ({ children, roles }) => {
   const { user, loading } = useAuth();
@@ -37,14 +39,29 @@ const ProtectedRoute = ({ children, roles }) => {
   return children;
 };
 
+const IndexRoute = () => {
+  const { user } = useAuth();
+  if (user?.role === 'waiter') return <Navigate to="/serving" replace />;
+  if (user?.role === 'barista') return <Navigate to="/preparing" replace />;
+  return <DashboardPage />;
+};
+
 const AppRoutes = () => {
   const { user } = useAuth();
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" /> : <LoginPage />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<AdminPage />} />
-        <Route path="serving" element={<ServingPage />} />
+        <Route index element={<IndexRoute />} />
+        <Route path="orders" element={
+          <ProtectedRoute roles={['admin']}><OrdersPage /></ProtectedRoute>
+        } />
+        <Route path="menu" element={
+          <ProtectedRoute roles={['admin']}><MenuPage /></ProtectedRoute>
+        } />
+        <Route path="serving" element={
+          <ProtectedRoute roles={['admin', 'waiter']}><ServingPage /></ProtectedRoute>
+        } />
         <Route path="preparing" element={
           <ProtectedRoute roles={['barista', 'admin']}><PreparingPage /></ProtectedRoute>
         } />

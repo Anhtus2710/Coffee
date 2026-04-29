@@ -1,132 +1,209 @@
 import { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import { useReadyItemsNotification } from '../hooks/useReadyItemsNotification.jsx';
 
-/* ─── helpers ─────────────────────────────────────────────────────────────── */
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n) + 'đ';
-const IMG_BASE = 'http://localhost:5000';
 
-const ZONE_LABELS = { indoor:'Trong nhà', outdoor:'Ngoài trời', vip:'VIP', bar:'Bar' };
-const ZONE_ICONS  = { indoor:'🏠', outdoor:'🌿', vip:'👑', bar:'🍸' };
-
-const STATUS = {
-  available:{ label:'Trống',          dot:'#22c55e', card:'#f0fdf4', border:'#86efac', text:'#15803d' },
-  occupied: { label:'Đang dùng',      dot:'#f97316', card:'#fff7ed', border:'#fdba74', text:'#c2410c' },
-  reserved: { label:'Đặt trước',      dot:'#eab308', card:'#fefce8', border:'#fde047', text:'#a16207' },
-  cleaning: { label:'Đang dọn',       dot:'#a855f7', card:'#faf5ff', border:'#d8b4fe', text:'#7e22ce' },
+const getImageUrl = (image) => {
+  if (!image) return '';
+  if (image.startsWith('http')) return image;
+  return `/images/products/${image}`;
 };
 
-/* ─── ProductCard (trong menu chọn món) ───────────────────────────────────── */
+const ZONE_LABELS = { indoor: 'Trong nhà', outdoor: 'Ngoài trời', vip: 'VIP', bar: 'Bar' };
+const ZONE_ICONS  = { indoor: '🏠', outdoor: '🌿', vip: '👑', bar: '🍸' };
+
+const STATUS = {
+  available: { label: 'Trống',      dot: 'bg-green-500', card: 'bg-green-50', border: 'border-green-300', text: 'text-green-700' },
+  occupied:  { label: 'Đang dùng',  dot: 'bg-orange-500', card: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700' },
+  reserved:  { label: 'Đặt trước',  dot: 'bg-yellow-500', card: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700' },
+  cleaning:  { label: 'Đang dọn',   dot: 'bg-purple-500', card: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700' },
+};
+
 function ProductCard({ product, onAdd }) {
   const [imgErr, setImgErr] = useState(false);
+  const hasImage = product.image && !imgErr;
+
   return (
     <div
       onClick={() => product.isAvailable ? onAdd(product) : toast.error('Món đang hết')}
-      style={{
-        borderRadius: 12, overflow: 'hidden', cursor: product.isAvailable ? 'pointer' : 'not-allowed',
-        border: '1.5px solid #e2e8f0', background: '#fff',
-        opacity: product.isAvailable ? 1 : 0.45,
-        transition: 'all .15s', boxShadow: '0 1px 4px rgba(0,0,0,.06)',
-      }}
-      onMouseEnter={e => { if (product.isAvailable) e.currentTarget.style.boxShadow = '0 4px 14px rgba(99,102,241,.18)'; e.currentTarget.style.borderColor = '#a5b4fc'; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,.06)'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+      className={`bg-white rounded-3xl p-3 shadow-sm border flex flex-col group relative transition-all h-full
+        ${product.isAvailable ? 'border-slate-200 cursor-pointer hover:border-indigo-400 hover:shadow-xl hover:shadow-indigo-100/50 hover:-translate-y-1' : 'border-red-200 bg-red-50/30 cursor-not-allowed opacity-75'}`}
     >
-      {/* Image */}
-      <div style={{ height: 80, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        {product.image && !imgErr
-          ? <img src={getProductImageUrl(product)} alt={product.name}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setImgErr(true)} />
-          : <span style={{ fontSize: '1.75rem', color: '#cbd5e1' }}>{product.category?.icon || '☕'}</span>
-        }
+      <div className="w-full aspect-square rounded-2xl overflow-hidden mb-3 bg-slate-100 relative shrink-0">
+        {hasImage ? (
+          <img src={getImageUrl(product.image)} alt={product.name} className={`w-full h-full object-cover transition-transform duration-300 ${product.isAvailable ? 'group-hover:scale-105' : 'grayscale'}`} onError={() => setImgErr(true)} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-5xl opacity-20 bg-slate-50">{product.category?.icon || '☕'}</div>
+        )}
+        {!product.isAvailable && (
+          <div className="absolute inset-0 bg-white/40 flex items-center justify-center backdrop-blur-[2px]">
+            <span className="text-[10px] font-black text-red-600 bg-red-100 px-3 py-1.5 rounded-lg shadow-sm border border-red-200 uppercase tracking-wider">Hết hàng</span>
+          </div>
+        )}
       </div>
-      <div style={{ padding: '8px 10px' }}>
-        <p style={{ fontWeight: 600, fontSize: '.75rem', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{product.name}</p>
-        <p style={{ fontWeight: 700, fontSize: '.8125rem', color: '#6366f1', marginTop: 2 }}>{fmt(product.price)}</p>
+      <div className="flex-1 flex flex-col px-1">
+        <p className="font-bold text-[14px] leading-tight text-slate-800 line-clamp-2">{product.name}</p>
+        <div className="mt-auto pt-2 flex items-end justify-between">
+          <p className="font-black text-indigo-600">{fmt(product.price)}</p>
+        </div>
       </div>
     </div>
   );
 }
 
-/* ─── OrderLine (bên panel phải) ──────────────────────────────────────────── */
-function OrderLine({ item, onQty, onRemove }) {
+function OrderLine({ item, onQty, onRemove, onEdit }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: '#fff', border: '1px solid #f1f5f9', borderRadius: 10, marginBottom: 6 }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontWeight: 600, fontSize: '.8125rem', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {item.name}
-          {item.size && item.size !== 'default' && <span style={{ color: '#94a3b8', fontWeight: 400 }}> ({item.size})</span>}
+    <div 
+      className="flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-xl mb-2 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group" 
+      onClick={() => onEdit(item)}
+    >
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-sm text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+          {item.name}{item.size && item.size !== 'default' && <span className="text-slate-400 font-medium"> ({item.size})</span>}
         </p>
-        <p style={{ fontSize: '.6875rem', color: '#94a3b8', marginTop: 1 }}>{fmt(item.price)} / cái</p>
+        <p className="text-xs font-medium text-slate-400 mt-0.5">{fmt(item.price)}</p>
+        {item.note && <p className="text-[11px] text-amber-600 font-bold mt-1.5 bg-amber-50 rounded px-1.5 py-0.5 inline-block truncate max-w-full">📝 {item.note}</p>}
       </div>
-      {/* qty controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <button onClick={() => onQty(item.key, -1)}
-          style={{ width: 22, height: 22, borderRadius: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', cursor: 'pointer', fontSize: '.875rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-        <span style={{ width: 20, textAlign: 'center', fontWeight: 700, fontSize: '.8125rem', color: '#1e293b' }}>{item.quantity}</span>
-        <button onClick={() => onQty(item.key, +1)}
-          style={{ width: 22, height: 22, borderRadius: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#64748b', cursor: 'pointer', fontSize: '.875rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+      <div className="flex flex-col items-end gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center bg-slate-50 rounded-lg p-0.5 border border-slate-200 shadow-sm">
+          <button onClick={() => onQty(item.key, -1)} className="w-8 h-8 rounded-md bg-white text-slate-600 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center font-bold transition-colors">−</button>
+          <span className="w-7 text-center font-black text-sm text-slate-800">{item.quantity}</span>
+          <button onClick={() => onQty(item.key, +1)} className="w-8 h-8 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 flex items-center justify-center font-bold transition-colors">+</button>
+        </div>
       </div>
-      <span style={{ minWidth: 68, textAlign: 'right', fontWeight: 700, fontSize: '.8125rem', color: '#ea580c' }}>{fmt(item.price * item.quantity)}</span>
-      <button onClick={() => onRemove(item.key)}
-        style={{ width: 22, height: 22, borderRadius: 6, background: '#fee2e2', border: '1px solid #fecaca', color: '#ef4444', cursor: 'pointer', fontSize: '.6875rem', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>✕</button>
+      <div className="flex flex-col items-end gap-1.5 shrink-0 ml-1" onClick={e => e.stopPropagation()}>
+        <span className="font-black text-sm text-orange-600">{fmt(item.price * item.quantity)}</span>
+        <button onClick={() => onRemove(item.key)} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center text-sm transition-colors" title="Xóa món">✕</button>
+      </div>
     </div>
   );
 }
 
-/* ─── InvoiceLine (bàn đã có đơn) ─────────────────────────────────────────── */
 function InvoiceLine({ item }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#fafafa', border: '1px solid #f1f5f9', borderRadius: 8, marginBottom: 5 }}>
-      <div style={{ flex: 1 }}>
-        <span style={{ fontSize: '.8125rem', color: '#1e293b', fontWeight: 500 }}>{item.name}</span>
-        {item.size && item.size !== 'default' && <span style={{ color: '#94a3b8', fontSize: '.75rem' }}> ({item.size})</span>}
-        {item.note && <p style={{ fontSize: '.6875rem', color: '#d97706', marginTop: 1 }}>📝 {item.note}</p>}
+    <div className="flex justify-between items-start p-3 bg-slate-50 border border-slate-100 rounded-xl mb-2">
+      <div className="flex-1">
+        <span className="text-sm text-slate-800 font-bold">{item.name}</span>
+        {item.size && item.size !== 'default' && <span className="text-slate-500 text-xs font-medium ml-1">({item.size})</span>}
+        {item.note && <p className="text-xs text-amber-600 font-bold mt-1 bg-amber-50 rounded px-1.5 py-0.5 inline-block">📝 {item.note}</p>}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, marginLeft: 8 }}>
-        <span style={{ fontSize: '.75rem', color: '#94a3b8' }}>×{item.quantity}</span>
-        <span style={{ fontWeight: 700, fontSize: '.8125rem', color: '#ea580c', minWidth: 70, textAlign: 'right' }}>{fmt(item.price * item.quantity)}</span>
+      <div className="flex items-center gap-3 shrink-0 ml-3">
+        <span className="text-xs font-bold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-200">×{item.quantity}</span>
+        <span className="font-black text-sm text-orange-600 min-w-[70px] text-right">{fmt(item.price * item.quantity)}</span>
       </div>
     </div>
   );
 }
 
-/* ─── SUCCESS overlay ─────────────────────────────────────────────────────── */
+function NoteModal({ item, onClose, onSave }) {
+  const [note, setNote] = useState(item.note || '');
+  const [size, setSize] = useState(item.size || 'default');
+  
+  if (!item) return null;
+  
+  return (
+    <div className="fixed inset-0 z-[400] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
+          <h3 className="font-bold text-slate-800 text-lg">Tùy chỉnh món</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 transition-colors">✕</button>
+        </div>
+        <div className="p-6">
+          <p className="font-black text-indigo-600 mb-6 text-xl">{item.name}</p>
+          
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-slate-700 mb-3">Kích cỡ (Size)</label>
+            <div className="flex gap-2">
+              {['default', 'M', 'L'].map(sz => (
+                <button key={sz} onClick={() => setSize(sz)} 
+                  className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all border-2
+                    ${size === sz ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}>
+                  {sz === 'default' ? 'Mặc định' : `Size ${sz}`}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-3">Ghi chú pha chế</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="Nhập ghi chú: ít đá, nhiều đường..."
+              className="w-full border-2 border-slate-200 rounded-xl p-4 text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all resize-none h-24 text-slate-800 bg-slate-50 focus:bg-white"
+            />
+          </div>
+          
+          <div className="mt-4 flex flex-wrap gap-2">
+            {['Ít đá', 'Không đá', 'Nhiều đường', 'Ít đường', 'Mang về'].map(tag => (
+              <button key={tag} onClick={() => setNote(prev => prev ? prev + ', ' + tag : tag)}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors">
+                + {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+        
+        <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+          <button onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">Hủy</button>
+          <button onClick={() => onSave(item.key, { size, note })} className="px-8 py-3 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2">
+            ✓ Lưu lại
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SuccessOverlay({ order, onClose }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(15,23,42,.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: 24, padding: '44px 52px', textAlign: 'center', boxShadow: '0 25px 60px rgba(0,0,0,.22)', maxWidth: 380, width: '100%' }}>
-        <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#ecfdf5', border: '2.5px solid #10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: '2rem' }}>✓</div>
-        <h2 style={{ color: '#10b981', fontWeight: 800, fontSize: '1.5rem', marginBottom: 8 }}>Đặt món thành công!</h2>
-        <p style={{ color: '#6366f1', fontWeight: 800, fontSize: '1.375rem', fontFamily: 'monospace' }}>{order.orderCode}</p>
-        <p style={{ color: '#6366f1', fontWeight: 700, fontSize: '1.125rem', margin: '6px 0 28px' }}>{fmt(order.total)}</p>
-        <button onClick={onClose} style={{ padding: '12px 36px', borderRadius: 12, background: '#6366f1', color: '#fff', fontWeight: 700, fontSize: '1rem', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(99,102,241,.30)' }}>
-          Tiếp tục
+    <div className="fixed inset-0 z-[500] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-white rounded-[2rem] p-8 text-center shadow-2xl max-w-sm w-full animate-in fade-in zoom-in-95 duration-300">
+        <div className="w-24 h-24 rounded-full bg-emerald-50 border-4 border-emerald-500 flex items-center justify-center mx-auto mb-6 text-emerald-500 text-5xl">✓</div>
+        <h2 className="text-emerald-500 font-black text-3xl mb-2">Thành công!</h2>
+        <p className="text-slate-500 font-medium mb-6">Đơn hàng đã được tạo</p>
+        <p className="text-indigo-600 font-black text-4xl font-mono mb-2">{order.orderCode}</p>
+        <p className="text-slate-800 font-bold text-2xl mb-8">{fmt(order.total)}</p>
+        <button onClick={onClose} className="w-full py-4 rounded-2xl bg-indigo-600 text-white font-bold text-lg shadow-xl shadow-indigo-600/30 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
+          Tiếp tục phục vụ
         </button>
       </div>
     </div>
   );
 }
 
+function CatBtn({ active, onClick, children }) {
+  return (
+    <button onClick={onClick} className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap shrink-0 transition-all duration-200 border-2
+      ${active ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800'}`}>
+      {children}
+    </button>
+  );
+}
+
 /* ─── MAIN ────────────────────────────────────────────────────────────────── */
-export default function WaiterPage() {
+export default function ServingPage() {
   const [tables, setTables]         = useState([]);
   const [products, setProducts]     = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading]       = useState(true);
-
-  const [selectedTable, setSelectedTable]   = useState(null);  // bàn đang chọn
-  const [existingOrder, setExistingOrder]   = useState(null);  // đơn hiện có của bàn
-  const [loadingOrder, setLoadingOrder]     = useState(false);
-
-  // cart — chỉ dùng khi bàn trống
-  const [cart, setCart]       = useState([]);
-  const [activeCat, setActiveCat] = useState('');
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [existingOrder, setExistingOrder] = useState(null);
+  const [loadingOrder, setLoadingOrder]   = useState(false);
+  const [mode, setMode]   = useState('map'); // 'map' | 'new-order' | 'view-invoice' | 'add-items'
+  const [cart, setCart]   = useState([]);
+  const [activeCat, setActiveCat]   = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(null);
+  const [editingNoteItem, setEditingNoteItem] = useState(null); // Cho popup Note
 
-  const [saving, setSaving]         = useState(false);
-  const [success, setSuccess]       = useState(null);
+  // Hook thông báo món sẵn sàng
+  useReadyItemsNotification();
 
-  /* fetch all data */
+  /* fetch data */
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -150,194 +227,240 @@ export default function WaiterPage() {
       try {
         const res = await api.get('/tables');
         setTables(res.data.data);
+        // Nếu đang xem hóa đơn — cập nhật lại existingOrder nếu bàn có đơn mới
+        setSelectedTable(prev => {
+          if (!prev) return prev;
+          return res.data.data.find(t => t._id === prev._id) || prev;
+        });
       } catch {}
     }, 8000);
     return () => clearInterval(iv);
   }, []);
 
-  /* khi chọn bàn — load đơn hiện tại nếu có */
+  /* polling existingOrder mỗi 5s để cập nhật trạng thái món và đơn */
+  useEffect(() => {
+    if (!existingOrder) return;
+    const iv = setInterval(async () => {
+      try {
+        const res = await api.get(`/orders/${existingOrder._id}`);
+        setExistingOrder(res.data.data);
+      } catch {}
+    }, 5000);
+    return () => clearInterval(iv);
+  }, [existingOrder?._id]);
+
+  /* chọn bàn */
   const handleSelectTable = async (table) => {
-    if (selectedTable?._id === table._id) return;
+    if (selectedTable?._id === table._id && mode !== 'map') return;
     setSelectedTable(table);
     setCart([]);
     setActiveCat('');
     setSearchTerm('');
     setExistingOrder(null);
 
-    if (table.status !== 'available' && table.currentOrder) {
-      setLoadingOrder(true);
-      try {
-        const res = await api.get(`/orders/${table.currentOrder._id || table.currentOrder}`);
-        setExistingOrder(res.data.data);
-      } catch { toast.error('Không tải được đơn hàng'); }
-      finally { setLoadingOrder(false); }
+    if (table.status === 'available') {
+      setMode('new-order');
+    } else {
+      setMode('view-invoice');
+      if (table.currentOrder) {
+        setLoadingOrder(true);
+        try {
+          const orderId = table.currentOrder._id || table.currentOrder;
+          const res = await api.get(`/orders/${orderId}`);
+          setExistingOrder(res.data.data);
+        } catch { toast.error('Không tải được đơn hàng'); }
+        finally { setLoadingOrder(false); }
+      }
     }
   };
 
-  /* cart helpers */
+  /* cart */
   const addToCart = (product) => {
-    const key = product._id;
+    const key = Date.now().toString() + Math.random().toString(36).substr(2, 5); // Tự tạo key độc lập cho mỗi item để dễ ghi chú riêng
     setCart(prev => {
-      const ex = prev.find(i => i.key === key);
-      if (ex) return prev.map(i => i.key === key ? { ...i, quantity: i.quantity + 1 } : i);
+      // Tìm xem có món nào CÙNG product, CÙNG size 'default' và KHÔNG có note không
+      // Nếu có thì gộp lại, nếu không thì thêm dòng mới
+      const exIdx = prev.findIndex(i => i.productId === product._id && i.size === 'default' && !i.note);
+      if (exIdx !== -1) {
+        const newCart = [...prev];
+        newCart[exIdx] = { ...newCart[exIdx], quantity: newCart[exIdx].quantity + 1 };
+        return newCart;
+      }
       return [...prev, { key, productId: product._id, name: product.name, price: product.price, quantity: 1, size: 'default', note: '' }];
     });
   };
   const changeQty = (key, delta) =>
     setCart(prev => prev.map(i => i.key === key ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i).filter(i => i.quantity > 0));
   const removeItem = (key) => setCart(prev => prev.filter(i => i.key !== key));
-
+  const saveNote = (key, data) => {
+    setCart(prev => prev.map(i => i.key === key ? { ...i, ...data } : i));
+    setEditingNoteItem(null);
+  };
   const cartTotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
-  /* confirm new order */
+  /* xác nhận đơn */
   const handleConfirm = async () => {
     if (cart.length === 0) { toast.error('Chưa chọn món nào'); return; }
     setSaving(true);
     try {
-      const res = await api.post('/orders', {
-        table: selectedTable._id,
-        orderType: 'dine-in',
-        items: cart.map(i => ({ product: i.productId, name: i.name, price: i.price, quantity: i.quantity, size: i.size, note: i.note })),
-        paymentMethod: 'cash',
-      });
-      setCart([]);
-      setSuccess(res.data.data);
-      await fetchData();
-      // reload order cho bàn vừa tạo
-      const tRes = await api.get('/tables');
-      setTables(tRes.data.data);
-      const updatedTable = tRes.data.data.find(t => t._id === selectedTable._id);
-      if (updatedTable) {
-        setSelectedTable(updatedTable);
-        if (updatedTable.currentOrder) {
-          const oRes = await api.get(`/orders/${updatedTable.currentOrder._id || updatedTable.currentOrder}`);
-          setExistingOrder(oRes.data.data);
+      if (mode === 'add-items' && existingOrder) {
+        await api.patch(`/orders/${existingOrder._id}/add-items`, {
+          items: cart.map(i => ({ product: i.productId, name: i.name, price: i.price, quantity: i.quantity, size: i.size, note: i.note })),
+        });
+        const oRes = await api.get(`/orders/${existingOrder._id}`);
+        setExistingOrder(oRes.data.data);
+        setCart([]);
+        setMode('view-invoice');
+        toast.success('✓ Đã thêm món');
+      } else if (mode === 'new-order') {
+        const res = await api.post('/orders', {
+          table: selectedTable._id,
+          orderType: 'dine-in',
+          items: cart.map(i => ({ product: i.productId, name: i.name, price: i.price, quantity: i.quantity, size: i.size, note: i.note })),
+          paymentMethod: 'cash',
+        });
+        setCart([]);
+        setSuccess(res.data.data);
+        const tRes = await api.get('/tables');
+        setTables(tRes.data.data);
+        const updatedTable = tRes.data.data.find(t => t._id === selectedTable._id);
+        if (updatedTable) {
+          setSelectedTable(updatedTable);
+          if (updatedTable.currentOrder) {
+            const oRes = await api.get(`/orders/${updatedTable.currentOrder._id || updatedTable.currentOrder}`);
+            setExistingOrder(oRes.data.data);
+          }
         }
+        setMode('view-invoice');
       }
-      toast.success(`✓ Đã tạo đơn ${res.data.data.orderCode}`);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Lỗi tạo đơn');
+      toast.error(err.response?.data?.message || 'Lỗi xác nhận đơn');
     } finally { setSaving(false); }
   };
 
-  /* filtered menu */
+  const handlePayment = async () => {
+    if (!existingOrder || !selectedTable || saving) return;
+    setSaving(true);
+    try {
+      await api.patch(`/orders/${existingOrder._id}/status`, { status: 'paid' });
+      toast.success(`✓ Đã thanh toán ${fmt(existingOrder.total)}`);
+      setSelectedTable(null);
+      setExistingOrder(null);
+      setCart([]);
+      setMode('map');
+      await fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Lỗi thanh toán');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* menu filter */
   const menuItems = products.filter(p => {
     const matchCat  = !activeCat || p.category?._id === activeCat || p.category === activeCat;
     const matchSrch = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase());
     return matchCat && matchSrch;
   });
 
-  /* group tables by zone */
-  const tablesByZone = tables.reduce((acc, t) => {
-    (acc[t.zone] = acc[t.zone] || []).push(t);
-    return acc;
-  }, {});
+  const tablesByZone = tables.reduce((acc, t) => { (acc[t.zone] = acc[t.zone] || []).push(t); return acc; }, {});
+  const showMenu    = mode === 'new-order' || mode === 'add-items';
+  const showInvoice = mode === 'view-invoice';
 
-  const isAvailable = selectedTable?.status === 'available';
+  const leftTitle = () => {
+    if (!selectedTable || mode === 'map') return 'Sơ đồ bàn';
+    const n = selectedTable.name || `Bàn ${selectedTable.number}`;
+    if (mode === 'new-order')    return `Chọn món — ${n}`;
+    if (mode === 'add-items')    return `Thêm món — ${n}`;
+    if (mode === 'view-invoice') return `Đang phục vụ — ${n}`;
+    return 'Sơ đồ bàn';
+  };
 
-  /* ────────────────── RENDER ────────────────── */
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f8fafc', fontFamily: 'DM Sans, system-ui, sans-serif' }}>
-
-      {/* ══════════════════════════════════════
-          CỘT TRÁI — 80% — Danh sách bàn
-          khi bàn trống → hiện menu chọn món
-      ══════════════════════════════════════ */}
-      <div style={{ flex: 8, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1.5px solid #e2e8f0' }}>
-
+    <div className="flex flex-col lg:flex-row h-[100dvh] w-full bg-slate-50 font-sans text-slate-800 overflow-hidden">
+      
+      {/* ══ CỘT TRÁI 70% ══ */}
+      <div className="flex flex-col flex-1 min-w-0 lg:w-[70%] lg:border-r border-slate-200">
         {/* Top bar */}
-        <div style={{ padding: '14px 20px 12px', background: '#fff', borderBottom: '1.5px solid #f1f5f9', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div>
-            <h1 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#1e293b', margin: 0 }}>
-              {selectedTable
-                ? (isAvailable ? `📋 Chọn món cho ${selectedTable.name || `Bàn ${selectedTable.number}`}` : `🪑 ${selectedTable.name || `Bàn ${selectedTable.number}`} — đang có khách`)
-                : '🍽 Sơ đồ bàn'
-              }
-            </h1>
-            <p style={{ fontSize: '.6875rem', color: '#94a3b8', margin: '2px 0 0' }}>
-              {tables.filter(t=>t.status==='occupied').length} đang dùng &nbsp;·&nbsp; {tables.filter(t=>t.status==='available').length} trống &nbsp;·&nbsp; Cập nhật mỗi 8s
-            </p>
-          </div>
-
-          {/* search + cat filter — chỉ hiện khi bàn trống */}
-          {selectedTable && isAvailable && (
-            <div style={{ display: 'flex', gap: 8, flex: 1, marginLeft: 8 }}>
-              <div style={{ position: 'relative', flex: 1, maxWidth: 240 }}>
-                <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '.875rem' }}>🔍</span>
-                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Tìm món..."
-                  style={{ width: '100%', padding: '7px 10px 7px 30px', borderRadius: 8, border: '1.5px solid #e2e8f0', background: '#f8fafc', fontSize: '.8125rem', color: '#1e293b', outline: 'none', boxSizing: 'border-box' }} />
+        <div className="bg-white px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-4 flex-wrap shadow-sm z-10 shrink-0">
+          <div className="shrink-0 flex items-center gap-3">
+            {!showMenu && !showInvoice && <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-2xl">🍽</div>}
+            {(showMenu || showInvoice) && selectedTable && (
+              <button onClick={() => { setSelectedTable(null); setCart([]); setMode('map'); }}
+                className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center font-bold text-xl transition-colors">
+                ←
+              </button>
+            )}
+            <div>
+              <h1 className="text-2xl font-black text-slate-800 tracking-tight">{leftTitle()}</h1>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-100">
+                  <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
+                  {tables.filter(t => t.status === 'occupied').length} đang dùng
+                </span>
+                <span className="text-xs font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-md border border-green-100">
+                  {tables.filter(t => t.status === 'available').length} trống
+                </span>
               </div>
-              <div style={{ display: 'flex', gap: 5, overflowX: 'auto' }}>
-                <button onClick={() => setActiveCat('')}
-                  style={{ padding: '6px 12px', borderRadius: 8, fontSize: '.75rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: !activeCat ? '#6366f1' : '#f1f5f9', color: !activeCat ? '#fff' : '#64748b', border: 'none' }}>
-                  Tất cả
-                </button>
-                {categories.map(c => (
-                  <button key={c._id} onClick={() => setActiveCat(activeCat === c._id ? '' : c._id)}
-                    style={{ padding: '6px 12px', borderRadius: 8, fontSize: '.75rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, background: activeCat === c._id ? '#6366f1' : '#f1f5f9', color: activeCat === c._id ? '#fff' : '#64748b', border: 'none' }}>
-                    {c.icon} {c.name}
-                  </button>
-                ))}
+            </div>
+          </div>
+          
+          {showMenu && (
+            <div className="flex-1 flex gap-3 min-w-[300px]">
+              <div className="relative flex-1 max-w-[280px]">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Tìm kiếm món..."
+                  className="w-full py-3 pl-11 pr-4 bg-slate-100 border-2 border-slate-100 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10 rounded-xl text-sm font-medium outline-none transition-all text-slate-700" />
+              </div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mb-1" style={{ scrollbarWidth: 'none' }}>
+                <CatBtn active={!activeCat} onClick={() => setActiveCat('')}>Tất cả</CatBtn>
+                {categories.map(c => <CatBtn key={c._id} active={activeCat === c._id} onClick={() => setActiveCat(activeCat === c._id ? '' : c._id)}>{c.icon} {c.name}</CatBtn>)}
               </div>
             </div>
           )}
         </div>
 
-        {/* Body — 2 trạng thái */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
-          {!selectedTable || !isAvailable ? (
-            /* ── SƠ ĐỒ BÀN ── */
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 pb-20 lg:pb-6">
+          {!showMenu ? (
             loading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
-                {[...Array(15)].map((_,i) => <div key={i} style={{ height: 96, borderRadius: 12, background: '#e2e8f0', animation: 'pulse 1.5s infinite' }} />)}
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+                {[...Array(15)].map((_, i) => <div key={i} className="h-32 rounded-3xl bg-slate-200 animate-pulse" />)}
               </div>
             ) : (
               Object.entries(tablesByZone).map(([zone, zoneTables]) => (
-                <div key={zone} style={{ marginBottom: 24 }}>
-                  {/* Zone header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: '1rem' }}>{ZONE_ICONS[zone] || '📍'}</span>
-                    <span style={{ fontWeight: 700, fontSize: '.8125rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                      {ZONE_LABELS[zone] || zone}
-                    </span>
-                    <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-                    <span style={{ fontSize: '.6875rem', color: '#94a3b8' }}>{zoneTables.length} bàn</span>
+                <div key={zone} className="mb-10">
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="text-2xl bg-white w-10 h-10 rounded-full shadow-sm flex items-center justify-center">{ZONE_ICONS[zone] || '📍'}</span>
+                    <h3 className="font-black text-slate-700 text-lg tracking-wide uppercase">{ZONE_LABELS[zone] || zone}</h3>
+                    <div className="flex-1 h-0.5 bg-slate-200 rounded-full" />
+                    <span className="text-sm font-bold text-slate-500 bg-slate-200 px-3 py-1 rounded-xl">{zoneTables.length} bàn</span>
                   </div>
-
-                  {/* Table cards */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
                     {zoneTables.map(table => {
                       const st = STATUS[table.status] || STATUS.available;
                       const isSel = selectedTable?._id === table._id;
                       return (
                         <button key={table._id} onClick={() => handleSelectTable(table)}
-                          style={{
-                            padding: '14px 8px 12px', borderRadius: 14, cursor: 'pointer',
-                            background: isSel ? '#eef2ff' : st.card,
-                            border: isSel ? '2.5px solid #6366f1' : `1.5px solid ${st.border}`,
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                            transition: 'all .15s',
-                            boxShadow: isSel ? '0 0 0 3px rgba(99,102,241,.15)' : '0 1px 3px rgba(0,0,0,.05)',
-                          }}>
-                          {/* status dot */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: isSel ? '#6366f1' : st.dot, display: 'inline-block', flexShrink: 0,
-                              ...(table.status==='occupied' ? { animation: 'pulse 1.5s infinite' } : {}) }} />
-                            <span style={{ fontSize: '.5625rem', fontWeight: 700, color: isSel ? '#6366f1' : st.text, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                          className={`relative p-5 rounded-3xl cursor-pointer flex flex-col items-center gap-2.5 transition-all duration-200 border-2
+                            ${isSel ? 'bg-indigo-50 border-indigo-500 shadow-xl shadow-indigo-200/50 -translate-y-1' : `${st.card} border-transparent hover:border-slate-300 hover:shadow-lg hover:-translate-y-1`}
+                          `}>
+                          <div className="flex items-center gap-2 w-full justify-center">
+                            <span className={`w-2.5 h-2.5 rounded-full ${isSel ? 'bg-indigo-600 animate-pulse' : st.dot}`} />
+                            <span className={`text-[11px] font-black uppercase tracking-wider ${isSel ? 'text-indigo-600' : st.text}`}>
                               {isSel ? 'Đang chọn' : st.label}
                             </span>
                           </div>
-                          {/* table number */}
-                          <span style={{ fontWeight: 800, fontSize: '1.0625rem', color: isSel ? '#6366f1' : '#1e293b', lineHeight: 1 }}>
+                          <span className={`font-black text-2xl leading-none ${isSel ? 'text-indigo-700' : 'text-slate-800'}`}>
                             {table.name || `Bàn ${table.number}`}
                           </span>
-                          {/* capacity */}
-                          <span style={{ fontSize: '.5625rem', color: '#94a3b8' }}>👤 {table.capacity}</span>
-                          {/* order amount if occupied */}
+                          <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5 mt-1">
+                            <span className="opacity-60 text-sm">👥</span> {table.capacity}
+                          </span>
                           {table.currentOrder?.total > 0 && (
-                            <span style={{ fontSize: '.625rem', fontWeight: 700, color: '#ea580c', background: '#fff7ed', padding: '2px 6px', borderRadius: 6 }}>
+                            <div className="mt-2 text-sm font-black text-orange-600 bg-orange-100 px-3 py-1.5 rounded-xl border border-orange-200 w-full text-center">
                               {fmt(table.currentOrder.total)}
-                            </span>
+                            </div>
                           )}
                         </button>
                       );
@@ -347,193 +470,142 @@ export default function WaiterPage() {
               ))
             )
           ) : (
-            /* ── MENU CHỌN MÓN (bàn trống) ── */
-            <div>
-              {menuItems.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
-                  <div style={{ fontSize: '3rem', opacity: .3 }}>☕</div>
-                  <p style={{ marginTop: 12 }}>Không tìm thấy món</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+            menuItems.length === 0
+              ? <div className="text-center py-24 flex flex-col items-center justify-center"><div className="text-7xl opacity-20 mb-5 grayscale">☕</div><p className="text-slate-500 font-bold text-xl">Không tìm thấy món nào</p></div>
+              : <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
                   {menuItems.map(p => <ProductCard key={p._id} product={p} onAdd={addToCart} />)}
                 </div>
-              )}
-
-              {/* back to map button */}
-              <div style={{ textAlign: 'center', marginTop: 20 }}>
-                <button onClick={() => { setSelectedTable(null); setCart([]); }}
-                  style={{ padding: '8px 20px', borderRadius: 8, background: '#f1f5f9', color: '#64748b', fontWeight: 600, fontSize: '.8125rem', border: '1.5px solid #e2e8f0', cursor: 'pointer' }}>
-                  ← Quay về sơ đồ bàn
-                </button>
-              </div>
-            </div>
           )}
         </div>
       </div>
 
-      {/* ══════════════════════════════════════
-          CỘT PHẢI — 20% — Hóa đơn / Đơn hàng
-      ══════════════════════════════════════ */}
-      <div style={{ flex: 2, minWidth: 220, maxWidth: 320, display: 'flex', flexDirection: 'column', background: '#fff', overflow: 'hidden' }}>
-
-        {/* Panel header */}
-        <div style={{ padding: '14px 16px 12px', borderBottom: '1.5px solid #f1f5f9', flexShrink: 0 }}>
-          <h2 style={{ fontWeight: 700, fontSize: '.9375rem', color: '#1e293b', margin: 0 }}>
-            {!selectedTable
-              ? '🧾 Hóa đơn'
-              : isAvailable
-                ? `🛒 Đặt món — ${selectedTable.name || `Bàn ${selectedTable.number}`}`
-                : `🧾 ${selectedTable.name || `Bàn ${selectedTable.number}`}`
-            }
-          </h2>
-          {selectedTable && (
-            <p style={{ fontSize: '.6875rem', color: '#94a3b8', marginTop: 3 }}>
-              {ZONE_ICONS[selectedTable.zone]} {ZONE_LABELS[selectedTable.zone]}
-              {!isAvailable && existingOrder && <span style={{ marginLeft: 6, fontFamily: 'monospace', color: '#6366f1' }}>{existingOrder.orderCode}</span>}
-            </p>
+      {/* ══ CỘT PHẢI 30% ══ */}
+      <div className="flex flex-col w-full lg:w-[380px] xl:w-[420px] bg-white lg:h-full border-t border-slate-200 shrink-0 z-20 shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.05)]">
+        {/* Header Right */}
+        <div className="bg-slate-50 px-6 py-5 border-b border-slate-200 shrink-0 flex items-center justify-between">
+          <div>
+            <h2 className="font-black text-xl text-slate-800">
+              {!selectedTable ? 'Chi tiết đơn' : showMenu ? `🛒 ${mode === 'add-items' ? 'Thêm món mới' : 'Tạo đơn mới'}` : `🧾 Hóa đơn`}
+            </h2>
+            {selectedTable && (
+              <p className="text-sm font-bold text-slate-500 mt-1 flex items-center gap-2">
+                <span className="bg-slate-200 px-2 py-0.5 rounded-md text-[11px] uppercase tracking-wider text-slate-600">{ZONE_LABELS[selectedTable.zone]}</span>
+                <span className="text-slate-800">{selectedTable.name || `Bàn ${selectedTable.number}`}</span>
+              </p>
+            )}
+          </div>
+          {showInvoice && existingOrder && (
+             <span className="text-sm font-bold font-mono text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">#{existingOrder.orderCode}</span>
           )}
         </div>
 
-        {/* Items list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+        {/* List items */}
+        <div className="flex-1 overflow-y-auto p-5 bg-slate-50/50 relative">
           {!selectedTable && (
-            <div style={{ textAlign: 'center', padding: '50px 0' }}>
-              <div style={{ fontSize: '2.5rem', opacity: .2 }}>🪑</div>
-              <p style={{ marginTop: 12, fontSize: '.8125rem', color: '#94a3b8', fontWeight: 500 }}>Chọn bàn để xem</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-slate-400">
+              <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center text-4xl mb-4 grayscale opacity-50 shadow-inner">🪑</div>
+              <p className="font-bold text-slate-500 text-lg">Chưa chọn bàn</p>
+              <p className="text-sm mt-2 max-w-[200px]">Vui lòng chọn bàn ở sơ đồ bên trái để bắt đầu phục vụ.</p>
             </div>
           )}
-
-          {/* Bàn trống → hiện cart */}
-          {selectedTable && isAvailable && (
+          {selectedTable && showMenu && (
             cart.length === 0
-              ? <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                  <div style={{ fontSize: '2.5rem', opacity: .2 }}>🍽</div>
-                  <p style={{ marginTop: 10, fontSize: '.8125rem', color: '#94a3b8', fontWeight: 500 }}>Chưa chọn món nào</p>
-                  <p style={{ fontSize: '.6875rem', color: '#94a3b8', marginTop: 4 }}>Chọn từ menu bên trái</p>
+              ? <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                  <div className="w-24 h-24 bg-slate-100 border-2 border-dashed border-slate-300 rounded-full flex items-center justify-center text-4xl mb-4 grayscale opacity-50">🍽</div>
+                  <p className="font-bold text-slate-500 text-lg">Giỏ hàng trống</p>
+                  <p className="text-sm mt-2 text-slate-400 max-w-[200px]">Chọn món ở menu để thêm vào đơn.</p>
                 </div>
-              : cart.map(item => (
-                  <OrderLine key={item.key} item={item} onQty={changeQty} onRemove={removeItem} />
-                ))
+              : <div className="animate-in slide-in-from-bottom-2 duration-300">
+                  {cart.map(item => <OrderLine key={item.key} item={item} onQty={changeQty} onRemove={removeItem} onEdit={setEditingNoteItem} />)}
+                </div>
           )}
-
-          {/* Bàn có khách → hiện hóa đơn */}
-          {selectedTable && !isAvailable && (
+          {selectedTable && showInvoice && (
             loadingOrder
-              ? <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: '.875rem' }}>⟳ Đang tải...</div>
+              ? <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
+                  <div className="w-10 h-10 border-4 border-slate-200 border-t-indigo-500 rounded-full animate-spin"></div>
+                  <p className="font-bold">Đang tải hóa đơn...</p>
+                </div>
               : existingOrder
-                ? <>
-                    {/* status badge */}
-                    <div style={{ marginBottom: 10 }}>
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 5,
-                        padding: '4px 10px', borderRadius: 20,
-                        background: '#eef2ff', color: '#6366f1', fontSize: '.6875rem', fontWeight: 700,
-                      }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1', animation: 'pulse 1.5s infinite' }} />
-                        {existingOrder.status === 'pending' ? 'Chờ xác nhận' :
-                         existingOrder.status === 'confirmed' ? 'Đã xác nhận' :
-                         existingOrder.status === 'preparing' ? 'Đang pha chế' :
-                         existingOrder.status === 'ready' ? 'Sẵn sàng' :
-                         existingOrder.status === 'served' ? 'Đã phục vụ' : existingOrder.status}
+                ? <div className="animate-in fade-in duration-300">
+                    <div className="mb-5 flex justify-center">
+                      <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border-2
+                        ${existingOrder.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-sm shadow-amber-100' : 
+                          existingOrder.status === 'ready' ? 'bg-green-50 text-green-600 border-green-200 shadow-sm shadow-green-100' :
+                          'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm shadow-indigo-100'}`}>
+                        <span className={`w-2 h-2 rounded-full ${existingOrder.status === 'pending' ? 'bg-amber-500 animate-pulse' : existingOrder.status === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-indigo-500'}`} />
+                        {{ pending:'Chờ nhà bếp xác nhận', confirmed:'Nhà bếp đã nhận', preparing:'Đang pha chế', ready:'Sẵn sàng phục vụ', served:'Đã phục vụ', paid:'Đã thanh toán' }[existingOrder.status] || existingOrder.status}
                       </span>
                     </div>
                     {existingOrder.items?.map((item, i) => <InvoiceLine key={i} item={item} />)}
-                  </>
-                : <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: '.8125rem' }}>
-                    Không tìm thấy đơn hàng
                   </div>
+                : <div className="text-center py-10 font-bold text-slate-400">Không tìm thấy đơn hàng</div>
           )}
         </div>
 
-        {/* ── FOOTER: Tổng + Nút xác nhận ── */}
-        <div style={{ padding: '12px 14px 16px', borderTop: '2px solid #f1f5f9', flexShrink: 0, background: '#fafafa' }}>
-          {/* Tổng tiền */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        {/* Footer Actions */}
+        <div className="bg-white border-t border-slate-200 p-6 shrink-0 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.1)]">
+          <div className="flex justify-between items-end mb-5">
             <div>
-              <p style={{ fontSize: '.6875rem', color: '#94a3b8', fontWeight: 600, margin: 0 }}>TỔNG CỘNG</p>
-              <p style={{ fontSize: '1.375rem', fontWeight: 800, color: '#ea580c', fontFamily: 'monospace', margin: '2px 0 0', lineHeight: 1 }}>
-                {!selectedTable
-                  ? '—'
-                  : isAvailable
-                    ? fmt(cartTotal)
-                    : existingOrder ? fmt(existingOrder.total) : '—'
-                }
+              <p className="text-[11px] font-black uppercase tracking-widest text-slate-400 mb-1">Tổng thanh toán</p>
+              <p className="text-4xl font-black text-orange-600 leading-none tracking-tight">
+                {!selectedTable ? '0đ' : showMenu ? fmt(cartTotal) : existingOrder ? fmt(existingOrder.total) : '0đ'}
               </p>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '.6875rem', color: '#94a3b8', margin: 0 }}>
-                {isAvailable
-                  ? `${cart.reduce((s,i) => s+i.quantity, 0)} món`
-                  : existingOrder ? `${existingOrder.items?.reduce((s,i) => s+i.quantity, 0)} món` : ''
-                }
+            <div className="text-right">
+              <p className="text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                {showMenu ? `${cart.reduce((s,i) => s+i.quantity, 0)} sản phẩm` : existingOrder ? `${existingOrder.items?.reduce((s,i) => s+i.quantity,0)||0} sản phẩm` : '0 sản phẩm'}
               </p>
             </div>
           </div>
 
-          {/* Nút hành động */}
-          {!selectedTable && (
-            <div style={{ textAlign: 'center', padding: '8px 0', fontSize: '.75rem', color: '#94a3b8' }}>Chọn bàn để thao tác</div>
-          )}
+          {!selectedTable && <div className="w-full py-5 text-center rounded-2xl bg-slate-50 text-slate-400 font-bold border-2 border-dashed border-slate-200">Chưa chọn bàn</div>}
 
-          {/* Bàn trống — nút Xác nhận đơn */}
-          {selectedTable && isAvailable && (
-            <button
-              onClick={handleConfirm}
-              disabled={cart.length === 0 || saving}
-              style={{
-                width: '100%', padding: '13px 0', borderRadius: 12, border: 'none', cursor: cart.length > 0 && !saving ? 'pointer' : 'not-allowed',
-                background: cart.length > 0 ? '#10b981' : '#e2e8f0',
-                color: cart.length > 0 ? '#fff' : '#9ca3af',
-                fontWeight: 800, fontSize: '1rem',
-                boxShadow: cart.length > 0 ? '0 4px 14px rgba(16,185,129,.30)' : 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'all .15s',
-              }}>
-              {saving ? '⟳ Đang lưu...' : '✓ Xác nhận đơn hàng'}
-            </button>
-          )}
-
-          {/* Bàn có khách — nút Thêm món + Thanh toán */}
-          {selectedTable && !isAvailable && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button
-                onClick={() => { setSelectedTable({ ...selectedTable, status: 'available', _forceMenu: true }); setCart([]); }}
-                style={{ width: '100%', padding: '10px 0', borderRadius: 10, background: '#fff', color: '#6366f1', fontWeight: 700, fontSize: '.875rem', border: '1.5px solid #c7d2fe', cursor: 'pointer', boxShadow: '0 2px 8px rgba(99,102,241,.12)' }}>
-                + Thêm món
+          {selectedTable && showMenu && (
+            <div className="flex flex-col gap-3">
+              <button onClick={handleConfirm} disabled={cart.length === 0 || saving}
+                className={`w-full py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 transition-all
+                  ${cart.length > 0 && !saving ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/30 hover:-translate-y-1' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
+                {saving ? (
+                  <><div className="w-6 h-6 border-4 border-white/50 border-t-white rounded-full animate-spin" /> Đang xử lý...</>
+                ) : (
+                  mode === 'add-items' ? '✓ Cập nhật đơn' : '✓ Gửi nhà bếp'
+                )}
               </button>
+              {mode === 'add-items' && (
+                <button onClick={() => { setCart([]); setMode('view-invoice'); }}
+                  className="w-full py-3.5 rounded-xl bg-white border-2 border-slate-200 text-slate-600 font-bold hover:bg-slate-50 hover:border-slate-300 transition-colors">
+                  Hủy thêm món
+                </button>
+              )}
+            </div>
+          )}
+
+          {selectedTable && showInvoice && (
+            <div className="flex flex-col gap-3">
+              <button onClick={() => { setMode('add-items'); setCart([]); setActiveCat(''); setSearchTerm(''); }}
+                className="w-full py-4 rounded-2xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black border-2 border-indigo-200 hover:border-indigo-300 transition-all shadow-sm flex items-center justify-center gap-2 text-lg">
+                <span className="text-2xl leading-none mb-0.5">+</span> Thêm món
+              </button>
+
               <button
-                onClick={async () => {
-                  if (!existingOrder || !selectedTable) return;
-                  setSaving(true);
-                  try {
-                    await api.patch(`/orders/${existingOrder._id}/status`, { status: 'paid' });
-                    // Reset table status to available
-                    await api.patch(`/tables/${selectedTable._id}`, { status: 'available', currentOrder: null });
-                    toast.success('✓ Đã thanh toán');
-                    setSelectedTable(null);
-                    setExistingOrder(null);
-                    await fetchData();
-                  } catch { toast.error('Lỗi thanh toán'); }
-                  finally { setSaving(false); }
-                }}
+                onClick={handlePayment}
                 disabled={!existingOrder || saving}
-                style={{
-                  width: '100%', padding: '12px 0', borderRadius: 10, border: 'none', cursor: existingOrder ? 'pointer' : 'not-allowed',
-                  background: existingOrder ? '#6366f1' : '#e2e8f0',
-                  color: existingOrder ? '#fff' : '#9ca3af',
-                  fontWeight: 800, fontSize: '1rem',
-                  boxShadow: existingOrder ? '0 4px 14px rgba(99,102,241,.28)' : 'none',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}>
-                {saving ? '⟳ Đang xử lý...' : existingOrder ? `💰 Thanh toán ${fmt(existingOrder.total)}` : 'Thanh toán'}
+                className={`w-full py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 transition-all
+                  ${existingOrder && !saving ? 'bg-slate-800 hover:bg-slate-900 text-white shadow-xl shadow-slate-800/20 hover:-translate-y-1' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
+                {saving ? (
+                   <><div className="w-5 h-5 border-4 border-white/50 border-t-white rounded-full animate-spin" /> Đang xử lý...</>
+                ) : existingOrder ? (
+                  `💰 Thanh toán`
+                ) : (
+                  'Thanh toán'
+                )}
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Success overlay */}
+      {editingNoteItem && <NoteModal item={editingNoteItem} onClose={() => setEditingNoteItem(null)} onSave={saveNote} />}
       {success && <SuccessOverlay order={success} onClose={() => setSuccess(null)} />}
     </div>
   );

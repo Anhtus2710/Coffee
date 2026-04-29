@@ -1,44 +1,28 @@
-const fs = require('fs');
-const path = require('path');
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
+const cloudinary = require('cloudinary').v2;
 
-const productImageDir = path.join(__dirname, '../public/images/products');
-
-const sanitizeFilename = (name) => {
-  // Chuyển tiếng Việt và ký tự đặc biệt thành ký tự an toàn
-  return name
-    .normalize('NFD')                        // tách dấu khỏi chữ
-    .replace(/[\u0300-\u036f]/g, '')         // xóa dấu
-    .replace(/đ/gi, 'd')                     // đ → d
-    .replace(/[^a-zA-Z0-9._-]/g, '-')       // ký tự lạ → gạch ngang
-    .replace(/-+/g, '-')                     // nhiều gạch ngang → 1
-    .replace(/^-|-$/g, '')                   // xóa gạch ngang đầu/cuối
-    .toLowerCase();
-};
-
-const getImageFilename = (originalName) => {
-  if (!originalName) return `${Date.now()}.jpg`;
-  const ext = path.extname(originalName).toLowerCase() || '.jpg';
-  const baseName = path.basename(originalName, ext);
-  const safeName = sanitizeFilename(baseName);
-  // Thêm timestamp để tránh trùng tên file
-  return `${safeName}-${Date.now()}${ext}`;
-};
-
-const saveProductImage = (filename, fileBuffer) => {
-  if (!fs.existsSync(productImageDir)) {
-    fs.mkdirSync(productImageDir, { recursive: true });
+const extractPublicId = (url) => {
+  if (!url || !url.includes('cloudinary.com')) return null;
+  try {
+    const parts = url.split('/');
+    const fileWithExt = parts[parts.length - 1];
+    const publicId = fileWithExt.split('.')[0];
+    const folder = parts[parts.length - 2];
+    return folder + '/' + publicId;
+  } catch (err) {
+    return null;
   }
-  const imagePath = path.join(productImageDir, filename);
-  fs.writeFileSync(imagePath, fileBuffer);
 };
 
-const deleteProductImage = (product) => {
-  if (!product || !product.image) return;
-  const imagePath = path.join(productImageDir, product.image);
-  if (fs.existsSync(imagePath)) {
-    fs.unlinkSync(imagePath);
+const deleteCloudinaryImage = async (imageUrl) => {
+  const publicId = extractPublicId(imageUrl);
+  if (publicId) {
+    try {
+      await cloudinary.uploader.destroy(publicId);
+    } catch (err) {
+      console.error('Lỗi khi xóa ảnh trên Cloudinary:', err);
+    }
   }
 };
 
@@ -75,21 +59,20 @@ exports.getProduct = async (req, res, next) => {
 exports.createProduct = async (req, res, next) => {
   try {
     const productId = new mongoose.Types.ObjectId();
-    let imageName = req.body.image || '';
+    let imageUrl = req.body.image || '';
 
+    // Multer-storage-cloudinary trả về URL đầy đủ ở req.file.path
     if (req.file) {
-      imageName = getImageFilename(req.file.originalname);
+      imageUrl = req.file.path;
     }
 
     const productData = {
       ...req.body,
       _id: productId,
-      image: imageName
+      image: imageUrl
     };
 
     const product = await Product.create(productData);
-    if (req.file) saveProductImage(imageName, req.file.buffer);
-
     await product.populate('category', 'name icon');
     res.status(201).json({ success: true, data: product });
   } catch (error) { next(error); }
@@ -104,11 +87,10 @@ exports.updateProduct = async (req, res, next) => {
 
     if (req.file) {
       const oldImage = product.image;
-      const imageName = getImageFilename(req.file.originalname);
-      updateData.image = imageName;
-      saveProductImage(imageName, req.file.buffer);
-      if (oldImage && oldImage !== imageName) {
-        deleteProductImage({ image: oldImage });
+      updateData.image = req.file.path;
+      
+      if (oldImage && oldImage !== req.file.path) {
+        deleteCloudinaryImage(oldImage);
       }
     }
 
@@ -124,7 +106,10 @@ exports.deleteProduct = async (req, res, next) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) return res.status(404).json({ success: false, message: 'Không tìm thấy sản phẩm' });
-    deleteProductImage(product);
+    
+    if (product.image) {
+      deleteCloudinaryImage(product.image);
+    }
     res.json({ success: true, message: 'Đã xóa sản phẩm' });
   } catch (error) { next(error); }
 };

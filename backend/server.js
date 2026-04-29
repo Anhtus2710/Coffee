@@ -103,18 +103,9 @@ const autoSeedIfNeeded = async () => {
         console.log(`📋 First product: ${firstProduct.name}, image: "${firstProduct.image}"`);
         
         if (firstProduct.image) {
-          // If not in ObjectId.ext format, likely old data - reseed
-          const isNewFormat = firstProduct.image.match(/^[a-f0-9]{24}\.(jpg|png|jpeg|gif|webp)$/i);
-          console.log(`🔍 Image format check (should match ObjectId.ext): ${isNewFormat ? '✅ OK' : '❌ OLD FORMAT'}`);
-          
-          if (!isNewFormat) {
-            console.log('\n🌱 Detected old product images format. Clearing and re-seeding...');
-            await Product.deleteMany({});
-            console.log('🗑️  Cleared all products');
-            const seedFunction = require('./utils/seed.js');
-            await seedFunction();
-            console.log('✅ Database re-seeded with new images\n');
-          }
+          // Bỏ qua check định dạng ảnh vì hệ thống đã hỗ trợ cả URL Cloudinary
+          const isNewFormat = firstProduct.image.match(/^[a-f0-9]{24}\.(jpg|png|jpeg|gif|webp)$/i) || firstProduct.image.startsWith('http');
+          console.log(`🔍 Image format check: ${isNewFormat ? '✅ OK' : '⚠️ UNKNOWN FORMAT'}`);
         }
       }
     }

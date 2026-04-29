@@ -90,11 +90,19 @@ const ORDER_STATUS_TRANSITIONS = {
     ready: ['served'],
     served: ['paid'],
   },
+  server: {
+    // Phục vụ: Có quyền confirm, prepare, serve, pay like waiter
+    pending: ['confirmed', 'cancelled', 'paid'],
+    confirmed: ['preparing', 'cancelled', 'paid'],
+    preparing: ['ready', 'paid'],
+    ready: ['served', 'paid'],
+    served: ['paid'],
+  },
   waiter: {
-    pending: ['confirmed', 'cancelled'],
-    confirmed: ['preparing', 'cancelled'],
-    preparing: ['ready'],
-    ready: ['served'],
+    pending: ['confirmed', 'cancelled', 'paid'],
+    confirmed: ['preparing', 'cancelled', 'paid'],
+    preparing: ['ready', 'paid'],
+    ready: ['served', 'paid'],
     served: ['paid'],
   },
   barista: {
@@ -110,9 +118,35 @@ exports.updateOrderStatus = async (req, res, next) => {
     if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
 
     const role = req.user.role;
-    const allowed = ORDER_STATUS_TRANSITIONS[role]?.[order.status] || [];
-    if (!allowed.includes(status)) {
-      return res.status(403).json({ success: false, message: 'Bạn không có quyền cập nhật trạng thái này hoặc chuyển trạng thái không hợp lệ' });
+    
+    // ✅ Admin luôn được phép cập nhật trạng thái
+    if (role !== 'admin') {
+      // Kiểm tra quyền cho các role khác
+      const userRoleTransitions = ORDER_STATUS_TRANSITIONS[role];
+      
+      if (!userRoleTransitions) {
+        // Role không được định nghĩa
+        return res.status(403).json({ 
+          success: false, 
+          message: `Vai trò "${role}" không được phép cập nhật trạng thái đơn hàng` 
+        });
+      }
+      
+      const allowed = userRoleTransitions[order.status] || [];
+      if (!allowed.includes(status)) {
+        return res.status(403).json({ 
+          success: false, 
+          message: `Không thể chuyển đơn từ "${order.status}" sang "${status}" với vai trò "${role}"` 
+        });
+      }
+    }
+    
+    // ✅ Ngăn thanh toán đơn đã paid/cancelled
+    if (['paid', 'cancelled'].includes(order.status) && status === 'paid') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Không thể thanh toán đơn hàng đã ${order.status === 'paid' ? 'thanh toán' : 'hủy'}` 
+      });
     }
 
     order.status = status;

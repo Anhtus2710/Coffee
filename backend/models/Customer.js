@@ -11,7 +11,5 @@ const customerSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
-customerSchema.index({ phone: 1 }, { sparse: true });
-customerSchema.index({ email: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Customer', customerSchema);

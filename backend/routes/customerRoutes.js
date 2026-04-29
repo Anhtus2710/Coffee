@@ -9,6 +9,7 @@ const {
   updateCustomer,
   toggleStatus,
   adjustPoints,
+  deleteCustomer,
 } = require('../controllers/customerController');
 
 router.get('/',                     protect, getCustomers);
@@ -18,6 +19,6 @@ router.post('/',                    protect, createCustomer);
 router.put('/:id',                  protect, updateCustomer);
 router.patch('/:id/toggle',         protect, toggleStatus);
 router.patch('/:id/points',         protect, adjustPoints);
-router.delete('/:id',               protect, toggleStatus);
+router.delete('/:id',               protect, deleteCustomer);
 
 module.exports = router;

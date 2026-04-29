@@ -13,7 +13,7 @@ export default defineConfig({
           proxy.on('error', (err, req, res) => {
             console.log('Proxy error:', err.message);
             if (err.code === 'ECONNREFUSED') {
-              console.log('Backend server not found. Make sure backend is running on port 5002 or set VITE_API_URL environment variable.');
+              console.log('Backend server not found. Make sure backend is running on port 5001 or set VITE_API_URL environment variable.');
             }
           });
         }

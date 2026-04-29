@@ -1,91 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n) + 'đ';
 
-/* ══════════════════════════════════════════
-   TAB: Dashboard
-══════════════════════════════════════════ */
-function DashboardTab() {
-  const [stats, setStats] = useState({
-    totalRevenue: 0, totalOrders: 0,
-    todayRevenue: 0, todayOrders: 0,
-    avgOrderValue: 0, occupiedTables: 0, availableTables: 0,
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const [allRes, todayRes, tablesRes] = await Promise.all([
-          api.get('/orders?limit=1000&status=paid'),
-          api.get(`/orders?limit=500&status=paid&date=${today}`),
-          api.get('/tables'),
-        ]);
-
-        const allPaid   = allRes.data.data   || [];
-        const todayPaid = todayRes.data.data || [];
-        const tables    = tablesRes.data.data || [];
-
-        const totalRevenue = allPaid.reduce((s, o) => s + (o.total || 0), 0);
-        const todayRevenue = todayPaid.reduce((s, o) => s + (o.total || 0), 0);
-
-        setStats({
-          totalRevenue,
-          totalOrders: allPaid.length,
-          todayRevenue,
-          todayOrders: todayPaid.length,
-          avgOrderValue: allPaid.length > 0 ? Math.round(totalRevenue / allPaid.length) : 0,
-          occupiedTables:  tables.filter(t => t.status === 'occupied').length,
-          availableTables: tables.filter(t => t.status === 'available').length,
-        });
-      } catch {
-        toast.error('Không tải được thống kê');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-    const iv = setInterval(fetchStats, 10000);
-    return () => clearInterval(iv);
-  }, []);
-
-  if (loading) return <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Đang tải...</div>;
-
-  const cards = [
-    { label: 'Doanh thu hôm nay', value: fmt(stats.todayRevenue),   icon: '💰', bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
-    { label: 'Đơn hôm nay',       value: stats.todayOrders,          icon: '📋', bg: '#eff6ff', border: '#93c5fd', color: '#1e40af' },
-    { label: 'Doanh thu tổng',    value: fmt(stats.totalRevenue),    icon: '📊', bg: '#faf5ff', border: '#d8b4fe', color: '#6b21a8' },
-    { label: 'Trung bình/đơn',   value: fmt(stats.avgOrderValue),   icon: '📈', bg: '#fff7ed', border: '#fdba74', color: '#c2410c' },
-    { label: 'Bàn đang dùng',    value: stats.occupiedTables,        icon: '🪑', bg: '#fef2f2', border: '#fca5a5', color: '#be123c' },
-    { label: 'Bàn trống',         value: stats.availableTables,       icon: '✓',  bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
-  ];
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px,1fr))', gap: 20 }}>
-      {cards.map((c, i) => (
-        <div key={i} style={{ background: c.bg, border: `2px solid ${c.border}`, borderRadius: 12, padding: '20px 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <p style={{ fontSize: '.8125rem', color: c.color, opacity: .75, fontWeight: 600, margin: 0 }}>{c.label}</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 800, color: c.color, marginTop: 8, marginBottom: 0 }}>{c.value}</p>
-            </div>
-            <span style={{ fontSize: '2rem', opacity: .25 }}>{c.icon}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════
-   TAB: Orders
-══════════════════════════════════════════ */
-function OrdersTab() {
+export default function OrdersPage() {
   const auth = useAuth();
   const [orders, setOrders]             = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -201,8 +121,9 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
   if (loading) return <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Đang tải...</div>;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '24px', background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,.08)' }}>
+      <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>📋 Đơn hàng</h2>
+      
       {/* Filter buttons */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {['all','pending','confirmed','preparing','ready','served','paid','cancelled'].map(s => {
@@ -247,8 +168,8 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
                   const st = STATUS_CFG[order.status] || STATUS_CFG.pending;
                   const isSel = selectedOrder?._id === order._id;
                   return (
-                    <>
-                      <tr key={order._id}
+                    <React.Fragment key={order._id}>
+                      <tr
                         style={{ borderBottom: '1px solid #f1f5f9', background: isSel ? '#f8f9ff' : '#fff', transition: 'background .1s' }}
                         onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = '#fafafa'; }}
                         onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = '#fff'; }}>
@@ -384,7 +305,7 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
                           </td>
                         </tr>
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -394,47 +315,6 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════
-   MAIN AdminPage
-══════════════════════════════════════════ */
-export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-
-  const tabs = [
-    { key: 'dashboard', label: '📊 Tổng quan',  Component: DashboardTab },
-    { key: 'orders',    label: '📋 Đơn hàng',   Component: OrdersTab },
-  ];
-
-  const active = tabs.find(t => t.key === activeTab);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, padding: 4, fontFamily: 'DM Sans, system-ui, sans-serif' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 6, background: '#fff', borderRadius: 12, padding: 6, boxShadow: '0 1px 6px rgba(0,0,0,.08)', flexWrap: 'wrap' }}>
-        {tabs.map(t => (
-          <button key={t.key} onClick={() => setActiveTab(t.key)}
-            style={{
-              padding: '8px 20px', borderRadius: 8, fontSize: '.875rem', fontWeight: 700,
-              cursor: 'pointer', border: 'none', transition: 'all .12s',
-              background: activeTab === t.key ? '#6366f1' : 'transparent',
-              color:      activeTab === t.key ? '#fff' : '#64748b',
-              boxShadow:  activeTab === t.key ? '0 2px 8px rgba(99,102,241,.30)' : 'none',
-            }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Content */}
-      <div style={{ background: '#fff', borderRadius: 12, padding: '24px', boxShadow: '0 1px 6px rgba(0,0,0,.08)' }}>
-        {active && <active.Component />}
-      </div>
     </div>
   );
 }

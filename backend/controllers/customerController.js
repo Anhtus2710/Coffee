@@ -83,3 +83,11 @@ exports.adjustPoints = async (req, res, next) => {
     res.json({ success: true, data: c });
   } catch (err) { next(err); }
 };
+
+exports.deleteCustomer = async (req, res, next) => {
+  try {
+    const c = await Customer.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    if (!c) return res.status(404).json({ success: false, message: 'Không tìm thấy khách hàng' });
+    res.json({ success: true, message: 'Đã xóa khách hàng' });
+  } catch (err) { next(err); }
+};
