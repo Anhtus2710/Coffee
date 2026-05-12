@@ -2,8 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts';
 
 const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n) + 'đ';
+const shortFmt = (n) => {
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace('.0', '') + 'tr';
+  if (n >= 1000) return (n / 1000).toFixed(0) + 'k';
+  return n;
+};
 
 /* ══════════════════════════════════════════
    TAB: Dashboard
@@ -11,73 +17,143 @@ const fmt = (n) => new Intl.NumberFormat('vi-VN').format(n) + 'đ';
 function DashboardTab() {
   const [stats, setStats] = useState({
     totalRevenue: 0, totalOrders: 0,
-    todayRevenue: 0, todayOrders: 0,
+    dateRevenue: 0, dateOrders: 0,
     avgOrderValue: 0, occupiedTables: 0, availableTables: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'chart_day' | 'chart_week'
+  const [chartDataDay, setChartDataDay] = useState([]);
+  const [chartDataWeek, setChartDataWeek] = useState([]);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const [allRes, dateRes, tablesRes] = await Promise.all([
+        api.get('/orders?limit=1000&status=paid'),
+        api.get(`/orders?limit=500&status=paid&date=${selectedDate}`),
+        api.get('/tables'),
+      ]);
+
+      const allPaid   = allRes.data.data   || [];
+      const datePaid  = dateRes.data.data  || [];
+      const tables    = tablesRes.data.data || [];
+
+      const totalRevenue = allPaid.reduce((s, o) => s + (o.total || 0), 0);
+      const dateRevenue = datePaid.reduce((s, o) => s + (o.total || 0), 0);
+
+      setStats({
+        totalRevenue,
+        totalOrders: allPaid.length,
+        dateRevenue,
+        dateOrders: datePaid.length,
+        avgOrderValue: allPaid.length > 0 ? Math.round(totalRevenue / allPaid.length) : 0,
+        occupiedTables:  tables.filter(t => t.status === 'occupied').length,
+        availableTables: tables.filter(t => t.status === 'available').length,
+      });
+
+      // 1. Dữ liệu biểu đồ trong ngày (00:00 -> 23:59)
+      const dayData = Array.from({ length: 24 }, (_, i) => ({
+        name: `${i}h`,
+        revenue: 0,
+      }));
+      datePaid.forEach(o => {
+        const h = new Date(o.createdAt).getHours();
+        if (h >= 0 && h < 24) dayData[h].revenue += (o.total || 0);
+      });
+      setChartDataDay(dayData);
+
+      // 2. Dữ liệu biểu đồ trong tuần (T2 -> CN chứa selectedDate)
+      const dateObj = new Date(selectedDate);
+      const dayOfWeek = dateObj.getDay(); // 0 is Sunday
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(dateObj);
+      monday.setDate(dateObj.getDate() + diffToMonday);
+      
+      const weekData = [];
+      const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        weekData.push({ date: dateStr, name: dayNames[i], revenue: 0 });
+      }
+      
+      allPaid.forEach(o => {
+        const oDate = new Date(o.createdAt).toISOString().split('T')[0];
+        const wDay = weekData.find(d => d.date === oDate);
+        if (wDay) wDay.revenue += (o.total || 0);
+      });
+      setChartDataWeek(weekData);
+
+    } catch {
+      toast.error('Không tải được thống kê');
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const today = new Date().toISOString().split('T')[0];
-        const [allRes, todayRes, tablesRes] = await Promise.all([
-          api.get('/orders?limit=1000&status=paid'),
-          api.get(`/orders?limit=500&status=paid&date=${today}`),
-          api.get('/tables'),
-        ]);
-
-        const allPaid   = allRes.data.data   || [];
-        const todayPaid = todayRes.data.data || [];
-        const tables    = tablesRes.data.data || [];
-
-        const totalRevenue = allPaid.reduce((s, o) => s + (o.total || 0), 0);
-        const todayRevenue = todayPaid.reduce((s, o) => s + (o.total || 0), 0);
-
-        setStats({
-          totalRevenue,
-          totalOrders: allPaid.length,
-          todayRevenue,
-          todayOrders: todayPaid.length,
-          avgOrderValue: allPaid.length > 0 ? Math.round(totalRevenue / allPaid.length) : 0,
-          occupiedTables:  tables.filter(t => t.status === 'occupied').length,
-          availableTables: tables.filter(t => t.status === 'available').length,
-        });
-      } catch {
-        toast.error('Không tải được thống kê');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchStats();
     const iv = setInterval(fetchStats, 10000);
     return () => clearInterval(iv);
-  }, []);
+  }, [fetchStats]);
 
   if (loading) return <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Đang tải...</div>;
 
   const cards = [
-    { label: 'Doanh thu hôm nay', value: fmt(stats.todayRevenue),   icon: '💰', bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
-    { label: 'Đơn hôm nay',       value: stats.todayOrders,          icon: '📋', bg: '#eff6ff', border: '#93c5fd', color: '#1e40af' },
-    { label: 'Doanh thu tổng',    value: fmt(stats.totalRevenue),    icon: '📊', bg: '#faf5ff', border: '#d8b4fe', color: '#6b21a8' },
-    { label: 'Trung bình/đơn',   value: fmt(stats.avgOrderValue),   icon: '📈', bg: '#fff7ed', border: '#fdba74', color: '#c2410c' },
-    { label: 'Bàn đang dùng',    value: stats.occupiedTables,        icon: '🪑', bg: '#fef2f2', border: '#fca5a5', color: '#be123c' },
-    { label: 'Bàn trống',         value: stats.availableTables,       icon: '✓',  bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
+    { label: 'Doanh thu trong ngày', value: fmt(stats.dateRevenue),   icon: '💰', bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
+    { label: 'Đơn trong ngày',       value: stats.dateOrders,          icon: '📋', bg: '#eff6ff', border: '#93c5fd', color: '#1e40af' },
+    { label: 'Doanh thu tổng',       value: fmt(stats.totalRevenue),    icon: '📊', bg: '#faf5ff', border: '#d8b4fe', color: '#6b21a8' },
+    { label: 'Trung bình/đơn',       value: fmt(stats.avgOrderValue),   icon: '📈', bg: '#fff7ed', border: '#fdba74', color: '#c2410c' },
+    { label: 'Bàn đang dùng',        value: stats.occupiedTables,        icon: '🪑', bg: '#fef2f2', border: '#fca5a5', color: '#be123c' },
+    { label: 'Bàn trống',            value: stats.availableTables,       icon: '✓',  bg: '#f0fdf4', border: '#86efac', color: '#15803d' },
   ];
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px,1fr))', gap: 20 }}>
-      {cards.map((c, i) => (
-        <div key={i} style={{ background: c.bg, border: `2px solid ${c.border}`, borderRadius: 12, padding: '20px 24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <p style={{ fontSize: '.8125rem', color: c.color, opacity: .75, fontWeight: 600, margin: 0 }}>{c.label}</p>
-              <p style={{ fontSize: '1.5rem', fontWeight: 800, color: c.color, marginTop: 8, marginBottom: 0 }}>{c.value}</p>
-            </div>
-            <span style={{ fontSize: '2rem', opacity: .25 }}>{c.icon}</span>
-          </div>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={() => setViewMode('cards')} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: viewMode === 'cards' ? '#6366f1' : '#f1f5f9', color: viewMode === 'cards' ? '#fff' : '#64748b', fontWeight: 600, cursor: 'pointer' }}>Số liệu</button>
+          <button onClick={() => setViewMode('chart_day')} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: viewMode === 'chart_day' ? '#6366f1' : '#f1f5f9', color: viewMode === 'chart_day' ? '#fff' : '#64748b', fontWeight: 600, cursor: 'pointer' }}>Biểu đồ Ngày</button>
+          <button onClick={() => setViewMode('chart_week')} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: viewMode === 'chart_week' ? '#6366f1' : '#f1f5f9', color: viewMode === 'chart_week' ? '#fff' : '#64748b', fontWeight: 600, cursor: 'pointer' }}>Biểu đồ Tuần</button>
         </div>
-      ))}
+        <input 
+          type="date" 
+          value={selectedDate} 
+          onChange={(e) => setSelectedDate(e.target.value)} 
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: '.875rem', fontWeight: 600, color: '#475569', outline: 'none' }}
+        />
+      </div>
+
+      {viewMode === 'cards' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px,1fr))', gap: 20 }}>
+          {cards.map((c, i) => (
+            <div key={i} style={{ background: c.bg, border: `2px solid ${c.border}`, borderRadius: 12, padding: '20px 24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <p style={{ fontSize: '.8125rem', color: c.color, opacity: .75, fontWeight: 600, margin: 0 }}>{c.label}</p>
+                  <p style={{ fontSize: '1.5rem', fontWeight: 800, color: c.color, marginTop: 8, marginBottom: 0 }}>{c.value}</p>
+                </div>
+                <span style={{ fontSize: '2rem', opacity: .25 }}>{c.icon}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ height: 400, width: '100%', background: '#fff', padding: '30px 20px', borderRadius: 12, border: '2px solid #e2e8f0' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={viewMode === 'chart_day' ? chartDataDay : chartDataWeek} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} dy={10} />
+              <YAxis hide />
+              <Tooltip formatter={(value) => [fmt(value), 'Doanh thu']} cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,.1)' }} />
+              <Bar dataKey="revenue" fill="#6366f1" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                <LabelList dataKey="revenue" position="top" formatter={(val) => val > 0 ? shortFmt(val) : ''} style={{ fill: '#6366f1', fontSize: 12, fontWeight: 700 }} dy={-5} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }
@@ -90,19 +166,20 @@ function OrdersTab() {
   const [orders, setOrders]             = useState([]);
   const [loading, setLoading]           = useState(true);
   const [filter, setFilter]             = useState('all');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [paying, setPaying]             = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await api.get('/orders?limit=200');
+      const res = await api.get(`/orders?limit=200&date=${selectedDate}`);
       setOrders(res.data.data || []);
     } catch {
       toast.error('Không tải được đơn hàng');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchOrders();
@@ -195,34 +272,58 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
   };
 
   // FIX: tính count đúng — filter buttons dùng đúng orders gốc
-  const countOf = (s) => s === 'all' ? orders.length : orders.filter(o => o.status === s).length;
-  const displayOrders = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+  const countOf = (s) => {
+    if (s === 'all') return orders.length;
+    if (s === 'unpaid') return orders.filter(o => o.status !== 'paid' && o.status !== 'cancelled').length;
+    return orders.filter(o => o.status === s).length;
+  };
+  const displayOrders = orders.filter(o => {
+    if (filter === 'all') return true;
+    if (filter === 'unpaid') return o.status !== 'paid' && o.status !== 'cancelled';
+    return o.status === filter;
+  });
+
+  const FILTER_OPTIONS = [
+    { key: 'all', label: 'Tất cả', bg: '#6366f1', text: '#fff' },
+    { key: 'unpaid', label: 'Chưa thanh toán', bg: '#fef3c7', text: '#92400e' },
+    { key: 'paid', label: 'Đã thanh toán', bg: '#d1fae5', text: '#065f46' },
+    { key: 'cancelled', label: 'Đã hủy', bg: '#fee2e2', text: '#7f1d1d' },
+  ];
 
   if (loading) return <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Đang tải...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* Filter buttons */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {['all','pending','confirmed','preparing','ready','served','paid','cancelled'].map(s => {
-          const cfg = STATUS_CFG[s];
-          const isActive = filter === s;
-          const count = countOf(s);
-          return (
-            <button key={s} onClick={() => setFilter(s)}
-              style={{
-                padding: '7px 14px', borderRadius: 8, fontSize: '.8125rem', fontWeight: 700,
-                cursor: 'pointer', border: isActive ? 'none' : '1.5px solid #e2e8f0',
-                background: isActive ? (cfg?.bg || '#6366f1') : '#fff',
-                color:      isActive ? (cfg?.text || '#fff') : '#64748b',
-                boxShadow:  isActive ? '0 2px 8px rgba(0,0,0,.10)' : 'none',
-                transition: 'all .12s',
-              }}>
-              {s === 'all' ? 'Tất cả' : cfg?.label} ({count})
-            </button>
-          );
-        })}
+      {/* Top Bar: Filters & Date */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        {/* Filter buttons */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {FILTER_OPTIONS.map(opt => {
+            const isActive = filter === opt.key;
+            const count = countOf(opt.key);
+            return (
+              <button key={opt.key} onClick={() => setFilter(opt.key)}
+                style={{
+                  padding: '7px 14px', borderRadius: 8, fontSize: '.8125rem', fontWeight: 700,
+                  cursor: 'pointer', border: isActive ? 'none' : '1.5px solid #e2e8f0',
+                  background: isActive ? opt.bg : '#fff',
+                  color:      isActive ? opt.text : '#64748b',
+                  boxShadow:  isActive ? '0 2px 8px rgba(0,0,0,.10)' : 'none',
+                  transition: 'all .12s',
+                }}>
+                {opt.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        <input 
+          type="date" 
+          value={selectedDate} 
+          onChange={(e) => setSelectedDate(e.target.value)} 
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: '.875rem', fontWeight: 600, color: '#475569', outline: 'none' }}
+        />
       </div>
 
       {/* Table */}
@@ -329,16 +430,29 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
 
                               {/* Items */}
                               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, marginBottom: 12 }}>
-                                {(order.items || []).map((item, i) => (
-                                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '.875rem' }}>
-                                    <span style={{ color: '#1e293b' }}>
-                                      {item.name}
-                                      {item.size && item.size !== 'default' && <span style={{ color: '#94a3b8' }}> ({item.size})</span>}
-                                      <span style={{ color: '#94a3b8' }}> × {item.quantity}</span>
-                                    </span>
-                                    <span style={{ fontWeight: 700, color: '#1e293b' }}>{fmt(item.price * item.quantity)}</span>
-                                  </div>
-                                ))}
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
+                                      <th style={{ padding: '8px 0', textAlign: 'center', width: '50px', fontWeight: 600 }}>STT</th>
+                                      <th style={{ padding: '8px 0', textAlign: 'left', fontWeight: 600 }}>Tên món</th>
+                                      <th style={{ padding: '8px 0', textAlign: 'center', width: '60px', fontWeight: 600 }}>SL</th>
+                                      <th style={{ padding: '8px 0', textAlign: 'right', width: '100px', fontWeight: 600 }}>Thành tiền</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(order.items || []).map((item, i) => (
+                                      <tr key={i} style={{ borderBottom: '1px dashed #f1f5f9' }}>
+                                        <td style={{ padding: '8px 0', textAlign: 'center', color: '#64748b' }}>{i + 1}</td>
+                                        <td style={{ padding: '8px 0', color: '#1e293b', fontWeight: 600 }}>
+                                          {item.name}
+                                          {item.size && item.size !== 'default' && <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: 4 }}>({item.size})</span>}
+                                        </td>
+                                        <td style={{ padding: '8px 0', textAlign: 'center', color: '#1e293b', fontWeight: 600 }}>{item.quantity}</td>
+                                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>{fmt(item.price * item.quantity)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
                               </div>
 
                               {/* Totals */}
@@ -352,33 +466,6 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
                                   <span style={{ color: '#1e293b' }}>TỔNG CỘNG</span>
                                   <span style={{ color: '#ea580c', fontFamily: 'monospace' }}>{fmt(order.total || 0)}</span>
                                 </div>
-                              </div>
-
-                              {/* Action buttons */}
-                              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                                {order.status !== 'paid' && order.status !== 'cancelled' && (
-                                  <button
-                                    onClick={() => handlePayment(order._id)}
-                                    disabled={paying === order._id}
-                                    style={{
-                                      flex: 1, padding: '12px 0', borderRadius: 10, border: 'none',
-                                      background: paying === order._id ? '#e2e8f0' : '#10b981',
-                                      color: paying === order._id ? '#9ca3af' : '#fff',
-                                      fontWeight: 800, fontSize: '1rem',
-                                      cursor: paying === order._id ? 'not-allowed' : 'pointer',
-                                      boxShadow: paying === order._id ? 'none' : '0 4px 12px rgba(16,185,129,.30)',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                    }}>
-                                    {paying === order._id
-                                      ? <><span style={{ width: 16, height: 16, border: '2px solid #94a3b8', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }} /> Đang xử lý...</>
-                                      : `💰 Thanh toán ${fmt(order.total || 0)}`
-                                    }
-                                  </button>
-                                )}
-                                <button onClick={() => handlePrint(order)}
-                                  style={{ padding: '12px 20px', borderRadius: 10, background: '#f1f5f9', color: '#64748b', fontWeight: 700, fontSize: '.875rem', border: '1.5px solid #e2e8f0', cursor: 'pointer' }}>
-                                  🖨 In
-                                </button>
                               </div>
                             </div>
                           </td>

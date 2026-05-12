@@ -7,65 +7,37 @@ import api from '../services/api';
  * Polls every 3 seconds and shows toast notification when items are ready for pickup
  */
 export function useReadyItemsNotification() {
-  const previousItemsRef = useRef([]);
+  const previousOrdersRef = useRef([]);
   const isFirstLoadRef = useRef(true);
 
   useEffect(() => {
-    // Poll for ready items every 3 seconds
+    // Poll for ready orders every 3 seconds
     const pollInterval = setInterval(async () => {
       try {
-        // Lấy các đơn hàng đang pha chế hoặc đã xong (nhưng chưa thanh toán)
-        const [prepRes, servRes] = await Promise.all([
-          api.get('/orders?status=preparing&limit=100'),
-          api.get('/orders?status=served&limit=100')
-        ]);
-        
-        const currentReadyOrders = [...(prepRes.data.data || []), ...(servRes.data.data || [])];
+        // Chỉ lấy các đơn hàng đã xong toàn bộ (status = 'ready')
+        const res = await api.get('/orders?status=ready&limit=100');
+        const currentReadyOrders = res.data.data || [];
 
-        // Extract all ready items from orders
-        const currentItems = [];
-        currentReadyOrders.forEach(order => {
-          const readyItems = order.items?.filter(item => item.status === 'ready') || [];
-          readyItems.forEach(item => {
-            currentItems.push({
-              orderId: order._id,
-              orderCode: order.orderCode,
-              tableNumber: order.tableNumber,
-              table: order.table,
-              itemId: item._id,
-              itemName: item.name,
-              quantity: item.quantity,
-              size: item.size,
-            });
-          });
-        });
-
-        // Nếu là lần đầu tiên load trang, chỉ lưu lại danh sách chứ không báo
+        // Nếu là lần đầu tiên load trang, chỉ lưu lại danh sách
         if (isFirstLoadRef.current) {
-          previousItemsRef.current = currentItems;
+          previousOrdersRef.current = currentReadyOrders.map(o => o._id);
           isFirstLoadRef.current = false;
           return;
         }
 
-        // Compare with previous items to find NEW items
-        const previousIds = previousItemsRef.current.map(
-          item => `${item.orderId}-${item.itemId}`
-        );
+        const currentIds = currentReadyOrders.map(o => o._id);
+        const newReadyIds = currentIds.filter(id => !previousOrdersRef.current.includes(id));
 
-        const newItems = currentItems.filter(
-          item => !previousIds.includes(`${item.orderId}-${item.itemId}`)
-        );
-
-        // Show toast for each new item
-        newItems.forEach(item => {
-          const sizeText = item.size && item.size !== 'default' ? ` (${item.size})` : '';
-          const tableName = item.table?.name || (item.tableNumber ? `Bàn ${item.tableNumber}` : 'Khách mang về');
+        // Show toast cho mỗi đơn hàng vừa mới xong
+        newReadyIds.forEach(id => {
+          const order = currentReadyOrders.find(o => o._id === id);
+          const tableName = order.table?.name || (order.tableNumber ? `Bàn ${order.tableNumber}` : 'Khách mang về');
           
           toast((t) => (
             <div className="flex flex-col gap-1">
               <p className="font-bold text-slate-800 text-sm">🔔 {tableName}</p>
-              <p className="text-emerald-600 font-bold text-sm">✓ {item.quantity}x {item.itemName}{sizeText}</p>
-              <p className="text-xs text-slate-400 mt-1">Đã pha chế xong!</p>
+              <p className="text-emerald-600 font-bold text-sm">Đã pha chế xong toàn bộ món!</p>
+              <p className="text-xs text-slate-400 mt-1">Sẵn sàng phục vụ</p>
             </div>
           ), {
             duration: 8000,
@@ -73,15 +45,13 @@ export function useReadyItemsNotification() {
           });
         });
 
-        // Update the reference for next comparison
-        previousItemsRef.current = currentItems;
+        // Update the reference
+        previousOrdersRef.current = currentIds;
       } catch (error) {
-        // Silently catch errors - don't spam console
         console.debug('Ready items polling error:', error);
       }
     }, 3000);
 
-    // Cleanup interval on unmount
     return () => clearInterval(pollInterval);
   }, []);
 }

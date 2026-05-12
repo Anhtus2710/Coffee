@@ -10,19 +10,20 @@ export default function OrdersPage() {
   const [orders, setOrders]             = useState([]);
   const [loading, setLoading]           = useState(true);
   const [filter, setFilter]             = useState('all');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [paying, setPaying]             = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await api.get('/orders?limit=200');
+      const res = await api.get(`/orders?limit=200&date=${selectedDate}`);
       setOrders(res.data.data || []);
     } catch {
       toast.error('Không tải được đơn hàng');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchOrders();
@@ -115,32 +116,54 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
   };
 
   // FIX: tính count đúng — filter buttons dùng đúng orders gốc
-  const countOf = (s) => s === 'all' ? orders.length : orders.filter(o => o.status === s).length;
-  const displayOrders = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+  const countOf = (s) => {
+    if (s === 'all') return orders.length;
+    if (s === 'unpaid') return orders.filter(o => o.status !== 'paid' && o.status !== 'cancelled').length;
+    return orders.filter(o => o.status === s).length;
+  };
+  const displayOrders = orders.filter(o => {
+    if (filter === 'all') return true;
+    if (filter === 'unpaid') return o.status !== 'paid' && o.status !== 'cancelled';
+    return o.status === filter;
+  });
+
+  const FILTER_OPTIONS = [
+    { key: 'all', label: 'Tất cả', bg: '#6366f1', text: '#fff' },
+    { key: 'unpaid', label: 'Chưa thanh toán', bg: '#fef3c7', text: '#92400e' },
+    { key: 'paid', label: 'Đã thanh toán', bg: '#d1fae5', text: '#065f46' },
+    { key: 'cancelled', label: 'Đã hủy', bg: '#fee2e2', text: '#7f1d1d' },
+  ];
 
   if (loading) return <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Đang tải...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '24px', background: '#fff', borderRadius: 12, boxShadow: '0 1px 6px rgba(0,0,0,.08)' }}>
-      <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>📋 Đơn hàng</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>📋 Đơn hàng</h2>
+        <input 
+          type="date" 
+          value={selectedDate} 
+          onChange={(e) => setSelectedDate(e.target.value)} 
+          style={{ padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: '.875rem', fontWeight: 600, color: '#475569', outline: 'none' }}
+        />
+      </div>
       
       {/* Filter buttons */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {['all','pending','confirmed','preparing','ready','served','paid','cancelled'].map(s => {
-          const cfg = STATUS_CFG[s];
-          const isActive = filter === s;
-          const count = countOf(s);
+        {FILTER_OPTIONS.map(opt => {
+          const isActive = filter === opt.key;
+          const count = countOf(opt.key);
           return (
-            <button key={s} onClick={() => setFilter(s)}
+            <button key={opt.key} onClick={() => setFilter(opt.key)}
               style={{
                 padding: '7px 14px', borderRadius: 8, fontSize: '.8125rem', fontWeight: 700,
                 cursor: 'pointer', border: isActive ? 'none' : '1.5px solid #e2e8f0',
-                background: isActive ? (cfg?.bg || '#6366f1') : '#fff',
-                color:      isActive ? (cfg?.text || '#fff') : '#64748b',
+                background: isActive ? opt.bg : '#fff',
+                color:      isActive ? opt.text : '#64748b',
                 boxShadow:  isActive ? '0 2px 8px rgba(0,0,0,.10)' : 'none',
                 transition: 'all .12s',
               }}>
-              {s === 'all' ? 'Tất cả' : cfg?.label} ({count})
+              {opt.label} ({count})
             </button>
           );
         })}
@@ -250,16 +273,29 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
 
                               {/* Items */}
                               <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 12, marginBottom: 12 }}>
-                                {(order.items || []).map((item, i) => (
-                                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: '.875rem' }}>
-                                    <span style={{ color: '#1e293b' }}>
-                                      {item.name}
-                                      {item.size && item.size !== 'default' && <span style={{ color: '#94a3b8' }}> ({item.size})</span>}
-                                      <span style={{ color: '#94a3b8' }}> × {item.quantity}</span>
-                                    </span>
-                                    <span style={{ fontWeight: 700, color: '#1e293b' }}>{fmt(item.price * item.quantity)}</span>
-                                  </div>
-                                ))}
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
+                                      <th style={{ padding: '8px 0', textAlign: 'center', width: '50px', fontWeight: 600 }}>STT</th>
+                                      <th style={{ padding: '8px 0', textAlign: 'left', fontWeight: 600 }}>Tên món</th>
+                                      <th style={{ padding: '8px 0', textAlign: 'center', width: '60px', fontWeight: 600 }}>SL</th>
+                                      <th style={{ padding: '8px 0', textAlign: 'right', width: '100px', fontWeight: 600 }}>Thành tiền</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(order.items || []).map((item, i) => (
+                                      <tr key={i} style={{ borderBottom: '1px dashed #f1f5f9' }}>
+                                        <td style={{ padding: '8px 0', textAlign: 'center', color: '#64748b' }}>{i + 1}</td>
+                                        <td style={{ padding: '8px 0', color: '#1e293b', fontWeight: 600 }}>
+                                          {item.name}
+                                          {item.size && item.size !== 'default' && <span style={{ color: '#94a3b8', fontWeight: 400, marginLeft: 4 }}>({item.size})</span>}
+                                        </td>
+                                        <td style={{ padding: '8px 0', textAlign: 'center', color: '#1e293b', fontWeight: 600 }}>{item.quantity}</td>
+                                        <td style={{ padding: '8px 0', textAlign: 'right', fontWeight: 700, color: '#1e293b' }}>{fmt(item.price * item.quantity)}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
                               </div>
 
                               {/* Totals */}
@@ -275,32 +311,6 @@ ${order.discount > 0 ? `Giảm giá : -${fmt(order.discount)}\n` : ''}TỔNG C�
                                 </div>
                               </div>
 
-                              {/* Action buttons */}
-                              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                                {order.status !== 'paid' && order.status !== 'cancelled' && (
-                                  <button
-                                    onClick={() => handlePayment(order._id)}
-                                    disabled={paying === order._id}
-                                    style={{
-                                      flex: 1, padding: '12px 0', borderRadius: 10, border: 'none',
-                                      background: paying === order._id ? '#e2e8f0' : '#10b981',
-                                      color: paying === order._id ? '#9ca3af' : '#fff',
-                                      fontWeight: 800, fontSize: '1rem',
-                                      cursor: paying === order._id ? 'not-allowed' : 'pointer',
-                                      boxShadow: paying === order._id ? 'none' : '0 4px 12px rgba(16,185,129,.30)',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                    }}>
-                                    {paying === order._id
-                                      ? <><span style={{ width: 16, height: 16, border: '2px solid #94a3b8', borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }} /> Đang xử lý...</>
-                                      : `💰 Thanh toán ${fmt(order.total || 0)}`
-                                    }
-                                  </button>
-                                )}
-                                <button onClick={() => handlePrint(order)}
-                                  style={{ padding: '12px 20px', borderRadius: 10, background: '#f1f5f9', color: '#64748b', fontWeight: 700, fontSize: '.875rem', border: '1.5px solid #e2e8f0', cursor: 'pointer' }}>
-                                  🖨 In
-                                </button>
-                              </div>
                             </div>
                           </td>
                         </tr>

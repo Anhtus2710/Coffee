@@ -52,7 +52,7 @@ router.get("/table/:tableId", protect, async (req, res, next) => {
   }
 });
 
-router.put('/item/:orderId/:itemId', protect, authorize('barista', 'admin'), async (req, res) => {
+router.put('/item/:orderId/:itemId', protect, authorize('barista', 'admin', 'waiter', 'server'), async (req, res) => {
   try {
     const { status } = req.body;
     const order = await Order.findById(req.params.orderId);
@@ -63,12 +63,12 @@ router.put('/item/:orderId/:itemId', protect, authorize('barista', 'admin'), asy
     item.status = status;
 
     // Tự động cập nhật trạng thái của Order
-    // Nếu tất cả các món trong đơn đã xong ('ready' hoặc 'served'), chuyển đơn thành 'served' (đã phục vụ)
+    // Nếu tất cả các món trong đơn đã xong ('ready' hoặc 'served'), chuyển đơn thành 'ready' (Sẵn sàng phục vụ)
     // Nếu chưa xong hết, chuyển đơn thành 'preparing' (nếu đơn đang ở trạng thái pending/confirmed)
     const allItemsDone = order.items.every(i => ['ready', 'served'].includes(i.status));
     
     if (allItemsDone) {
-      order.status = 'served';
+      order.status = 'ready';
     } else if (['pending', 'confirmed'].includes(order.status)) {
       order.status = 'preparing';
     }

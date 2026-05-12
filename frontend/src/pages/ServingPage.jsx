@@ -12,13 +12,13 @@ const getImageUrl = (image) => {
 };
 
 const ZONE_LABELS = { indoor: 'Trong nhà', outdoor: 'Ngoài trời', vip: 'VIP', bar: 'Bar' };
-const ZONE_ICONS  = { indoor: '🏠', outdoor: '🌿', vip: '👑', bar: '🍸' };
+const ZONE_ICONS = { indoor: '🏠', outdoor: '🌿', vip: '👑', bar: '🍸' };
 
 const STATUS = {
-  available: { label: 'Trống',      dot: 'bg-green-500', card: 'bg-green-50', border: 'border-green-300', text: 'text-green-700' },
-  occupied:  { label: 'Đang dùng',  dot: 'bg-orange-500', card: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700' },
-  reserved:  { label: 'Đặt trước',  dot: 'bg-yellow-500', card: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700' },
-  cleaning:  { label: 'Đang dọn',   dot: 'bg-purple-500', card: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700' },
+  available: { label: 'Trống', dot: 'bg-green-500', card: 'bg-green-50', border: 'border-green-300', text: 'text-green-700' },
+  occupied: { label: 'Đang dùng', dot: 'bg-orange-500', card: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700' },
+  reserved: { label: 'Đặt trước', dot: 'bg-yellow-500', card: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700' },
+  cleaning: { label: 'Đang dọn', dot: 'bg-purple-500', card: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700' },
 };
 
 function ProductCard({ product, onAdd }) {
@@ -55,8 +55,8 @@ function ProductCard({ product, onAdd }) {
 
 function OrderLine({ item, onQty, onRemove, onEdit }) {
   return (
-    <div 
-      className="flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-xl mb-2 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group" 
+    <div
+      className="flex items-center gap-3 p-3 bg-white border-2 border-slate-100 rounded-xl mb-2 hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer group"
       onClick={() => onEdit(item)}
     >
       <div className="flex-1 min-w-0">
@@ -81,17 +81,43 @@ function OrderLine({ item, onQty, onRemove, onEdit }) {
   );
 }
 
-function InvoiceLine({ item }) {
+function InvoiceLine({ item, onToggle }) {
+  const isReady = item.status === 'ready';
+  const isServed = item.status === 'served';
+
+  let bgClass = 'bg-slate-50 border-slate-100';
+  let textClass = 'text-slate-800';
+  let badge = null;
+  let pxClass = 'bg-white text-slate-400 border-slate-200';
+  let priceClass = 'text-orange-600';
+
+  if (isReady) {
+    bgClass = 'bg-green-50/50 border-green-200 cursor-pointer hover:bg-green-100/70';
+    textClass = 'text-green-700';
+    badge = <span className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Đã xong</span>;
+    pxClass = 'bg-green-100/50 text-green-700 border-green-200';
+    priceClass = 'text-green-700';
+  } else if (isServed) {
+    bgClass = 'bg-red-50/50 border-red-200 cursor-pointer hover:bg-red-100/70';
+    textClass = 'text-red-600';
+    badge = <span className="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-md uppercase tracking-wider">Đang dùng</span>;
+    pxClass = 'bg-red-100/50 text-red-600 border-red-200';
+    priceClass = 'text-red-600';
+  }
+
   return (
-    <div className="flex justify-between items-start p-3 bg-slate-50 border border-slate-100 rounded-xl mb-2">
+    <div onClick={() => (isReady || isServed) && onToggle && onToggle(item)} className={`flex justify-between items-start p-3 border rounded-xl mb-2 transition-colors ${bgClass}`}>
       <div className="flex-1">
-        <span className="text-sm text-slate-800 font-bold">{item.name}</span>
-        {item.size && item.size !== 'default' && <span className="text-slate-500 text-xs font-medium ml-1">({item.size})</span>}
+        <span className={`text-sm font-bold flex items-center gap-2 ${textClass}`}>
+          {item.name}
+          {badge}
+        </span>
+        {item.size && item.size !== 'default' && <span className={`text-xs font-medium ${isReady ? 'text-green-600/70' : isServed ? 'text-red-500' : 'text-slate-500'}`}>({item.size})</span>}
         {item.note && <p className="text-xs text-amber-600 font-bold mt-1 bg-amber-50 rounded px-1.5 py-0.5 inline-block">📝 {item.note}</p>}
       </div>
       <div className="flex items-center gap-3 shrink-0 ml-3">
-        <span className="text-xs font-bold text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-200">×{item.quantity}</span>
-        <span className="font-black text-sm text-orange-600 min-w-[70px] text-right">{fmt(item.price * item.quantity)}</span>
+        <span className={`text-xs font-bold px-2 py-1 rounded-md border ${pxClass}`}>×{item.quantity}</span>
+        <span className={`font-black text-sm min-w-[70px] text-right ${priceClass}`}>{fmt(item.price * item.quantity)}</span>
       </div>
     </div>
   );
@@ -100,9 +126,9 @@ function InvoiceLine({ item }) {
 function NoteModal({ item, onClose, onSave }) {
   const [note, setNote] = useState(item.note || '');
   const [size, setSize] = useState(item.size || 'default');
-  
+
   if (!item) return null;
-  
+
   return (
     <div className="fixed inset-0 z-[400] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
@@ -112,12 +138,12 @@ function NoteModal({ item, onClose, onSave }) {
         </div>
         <div className="p-6">
           <p className="font-black text-indigo-600 mb-6 text-xl">{item.name}</p>
-          
+
           <div className="mb-6">
             <label className="block text-sm font-bold text-slate-700 mb-3">Kích cỡ (Size)</label>
             <div className="flex gap-2">
               {['default', 'M', 'L'].map(sz => (
-                <button key={sz} onClick={() => setSize(sz)} 
+                <button key={sz} onClick={() => setSize(sz)}
                   className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all border-2
                     ${size === sz ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'}`}>
                   {sz === 'default' ? 'Mặc định' : `Size ${sz}`}
@@ -125,7 +151,7 @@ function NoteModal({ item, onClose, onSave }) {
               ))}
             </div>
           </div>
-          
+
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-3">Ghi chú pha chế</label>
             <textarea
@@ -135,7 +161,7 @@ function NoteModal({ item, onClose, onSave }) {
               className="w-full border-2 border-slate-200 rounded-xl p-4 text-sm font-medium focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 outline-none transition-all resize-none h-24 text-slate-800 bg-slate-50 focus:bg-white"
             />
           </div>
-          
+
           <div className="mt-4 flex flex-wrap gap-2">
             {['Ít đá', 'Không đá', 'Nhiều đường', 'Ít đường', 'Mang về'].map(tag => (
               <button key={tag} onClick={() => setNote(prev => prev ? prev + ', ' + tag : tag)}
@@ -145,7 +171,7 @@ function NoteModal({ item, onClose, onSave }) {
             ))}
           </div>
         </div>
-        
+
         <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
           <button onClick={onClose} className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors">Hủy</button>
           <button onClick={() => onSave(item.key, { size, note })} className="px-8 py-3 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2">
@@ -157,22 +183,97 @@ function NoteModal({ item, onClose, onSave }) {
   );
 }
 
-function SuccessOverlay({ order, onClose }) {
+function PaymentConfirmModal({ order, table, onClose, onConfirm, saving }) {
+  if (!order) return null;
+
   return (
-    <div className="fixed inset-0 z-[500] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-white rounded-[2rem] p-8 text-center shadow-2xl max-w-sm w-full animate-in fade-in zoom-in-95 duration-300">
-        <div className="w-24 h-24 rounded-full bg-emerald-50 border-4 border-emerald-500 flex items-center justify-center mx-auto mb-6 text-emerald-500 text-5xl">✓</div>
-        <h2 className="text-emerald-500 font-black text-3xl mb-2">Thành công!</h2>
-        <p className="text-slate-500 font-medium mb-6">Đơn hàng đã được tạo</p>
-        <p className="text-indigo-600 font-black text-4xl font-mono mb-2">{order.orderCode}</p>
-        <p className="text-slate-800 font-bold text-2xl mb-8">{fmt(order.total)}</p>
-        <button onClick={onClose} className="w-full py-4 rounded-2xl bg-indigo-600 text-white font-bold text-lg shadow-xl shadow-indigo-600/30 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all">
-          Tiếp tục phục vụ
+    <div className="fixed inset-0 z-[500] bg-white flex flex-col animate-in fade-in duration-200">
+      {/* Header — mã đơn + thông tin */}
+      <div className="px-8 pt-6 pb-4 border-b border-slate-200 flex items-start justify-between shrink-0">
+        <div>
+          <p className="text-indigo-500 font-bold text-sm">{order.orderCode}</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {table?.name || `Bàn ${table?.number}`}
+            {order.staffName ? ` · Phục vụ: ${order.staffName}` : ''}
+          </p>
+        </div>
+        <button
+          onClick={onClose}
+          className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors text-lg"
+        >
+          ✕
         </button>
+      </div>
+
+      {/* Bảng món */}
+      <div className="flex-1 overflow-y-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="text-left text-xs font-bold text-slate-400 px-8 py-3 w-10">STT</th>
+              <th className="text-left text-xs font-bold text-slate-400 py-3">Tên món</th>
+              <th className="text-right text-xs font-bold text-slate-400 py-3 w-28">Đơn giá</th>
+              <th className="text-right text-xs font-bold text-slate-400 py-3 w-16">SL</th>
+              <th className="text-right text-xs font-bold text-slate-400 py-3 pr-8 w-32">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.items?.map((item, i) => (
+              <tr key={item._id || i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                <td className="px-8 py-3.5 text-sm text-slate-400">{i + 1}</td>
+                <td className="py-3.5 pr-4">
+                  <span className="font-semibold text-sm text-slate-800">{item.name}</span>
+                  {item.size && item.size !== 'default' && (
+                    <span className="text-slate-400 text-xs ml-1.5">({item.size})</span>
+                  )}
+                  {item.note && (
+                    <span className="ml-2 text-xs text-amber-600 font-medium bg-amber-50 px-1.5 py-0.5 rounded">
+                      📝 {item.note}
+                    </span>
+                  )}
+                </td>
+                <td className="py-3.5 text-right text-sm font-medium text-slate-500">{fmt(item.price)}</td>
+                <td className="py-3.5 text-right text-sm font-semibold text-slate-700">{item.quantity}</td>
+                <td className="py-3.5 pr-8 text-right text-sm font-bold text-slate-800">
+                  {fmt(item.price * item.quantity)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Footer — tổng cộng + nút */}
+      <div className="border-t border-slate-200 px-8 py-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
+          <span className="font-black text-slate-800 uppercase tracking-wider text-sm">Tổng cộng</span>
+          <span className="font-black text-orange-500 text-xl">{fmt(order.total)}</span>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-6 py-2.5 rounded-xl font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors text-sm"
+          >
+            Hủy
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={saving}
+            className="px-8 py-2.5 rounded-xl font-black text-sm bg-slate-800 hover:bg-slate-900 text-white transition-all flex items-center gap-2 shadow-lg shadow-slate-800/20"
+          >
+            {saving
+              ? <div className="w-4 h-4 border-[3px] border-white/40 border-t-white rounded-full animate-spin" />
+              : '💰 Xác nhận thu tiền'
+            }
+          </button>
+        </div>
       </div>
     </div>
   );
 }
+
+// Removed SuccessOverlay component
 
 function CatBtn({ active, onClick, children }) {
   return (
@@ -185,20 +286,20 @@ function CatBtn({ active, onClick, children }) {
 
 /* ─── MAIN ────────────────────────────────────────────────────────────────── */
 export default function ServingPage() {
-  const [tables, setTables]         = useState([]);
-  const [products, setProducts]     = useState([]);
+  const [tables, setTables] = useState([]);
+  const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const [loading, setLoading] = useState(true);
   const [selectedTable, setSelectedTable] = useState(null);
   const [existingOrder, setExistingOrder] = useState(null);
-  const [loadingOrder, setLoadingOrder]   = useState(false);
-  const [mode, setMode]   = useState('map'); // 'map' | 'new-order' | 'view-invoice' | 'add-items'
-  const [cart, setCart]   = useState([]);
-  const [activeCat, setActiveCat]   = useState('');
+  const [loadingOrder, setLoadingOrder] = useState(false);
+  const [mode, setMode] = useState('map'); // 'map' | 'new-order' | 'view-invoice' | 'add-items'
+  const [cart, setCart] = useState([]);
+  const [activeCat, setActiveCat] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(null);
   const [editingNoteItem, setEditingNoteItem] = useState(null); // Cho popup Note
+  const [showPaymentConfirm, setShowPaymentConfirm] = useState(false); // Cho xác nhận thanh toán
 
   // Hook thông báo món sẵn sàng
   useReadyItemsNotification();
@@ -232,7 +333,7 @@ export default function ServingPage() {
           if (!prev) return prev;
           return res.data.data.find(t => t._id === prev._id) || prev;
         });
-      } catch {}
+      } catch { }
     }, 8000);
     return () => clearInterval(iv);
   }, []);
@@ -244,7 +345,7 @@ export default function ServingPage() {
       try {
         const res = await api.get(`/orders/${existingOrder._id}`);
         setExistingOrder(res.data.data);
-      } catch {}
+      } catch { }
     }, 5000);
     return () => clearInterval(iv);
   }, [existingOrder?._id]);
@@ -320,7 +421,7 @@ export default function ServingPage() {
           paymentMethod: 'cash',
         });
         setCart([]);
-        setSuccess(res.data.data);
+        toast.success('✓ Tạo đơn hàng thành công!');
         const tRes = await api.get('/tables');
         setTables(tRes.data.data);
         const updatedTable = tRes.data.data.find(t => t._id === selectedTable._id);
@@ -344,6 +445,7 @@ export default function ServingPage() {
     try {
       await api.patch(`/orders/${existingOrder._id}/status`, { status: 'paid' });
       toast.success(`✓ Đã thanh toán ${fmt(existingOrder.total)}`);
+      setShowPaymentConfirm(false);
       setSelectedTable(null);
       setExistingOrder(null);
       setCart([]);
@@ -356,29 +458,45 @@ export default function ServingPage() {
     }
   };
 
+  const handleToggleItemStatus = async (item) => {
+    if (!existingOrder) return;
+    const newStatus = item.status === 'ready' ? 'served' : 'ready';
+    try {
+      await api.put(`/item/${existingOrder._id}/${item._id}`, { status: newStatus });
+      setExistingOrder(prev => {
+        const newOrder = { ...prev };
+        const idx = newOrder.items.findIndex(i => i._id === item._id);
+        if (idx !== -1) newOrder.items[idx].status = newStatus;
+        return newOrder;
+      });
+    } catch (err) {
+      toast.error('Lỗi cập nhật trạng thái món');
+    }
+  };
+
   /* menu filter */
   const menuItems = products.filter(p => {
-    const matchCat  = !activeCat || p.category?._id === activeCat || p.category === activeCat;
+    const matchCat = !activeCat || p.category?._id === activeCat || p.category === activeCat;
     const matchSrch = !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase());
     return matchCat && matchSrch;
   });
 
   const tablesByZone = tables.reduce((acc, t) => { (acc[t.zone] = acc[t.zone] || []).push(t); return acc; }, {});
-  const showMenu    = mode === 'new-order' || mode === 'add-items';
+  const showMenu = mode === 'new-order' || mode === 'add-items';
   const showInvoice = mode === 'view-invoice';
 
   const leftTitle = () => {
     if (!selectedTable || mode === 'map') return 'Sơ đồ bàn';
     const n = selectedTable.name || `Bàn ${selectedTable.number}`;
-    if (mode === 'new-order')    return `Chọn món — ${n}`;
-    if (mode === 'add-items')    return `Thêm món — ${n}`;
+    if (mode === 'new-order') return `Chọn món — ${n}`;
+    if (mode === 'add-items') return `Thêm món — ${n}`;
     if (mode === 'view-invoice') return `Đang phục vụ — ${n}`;
     return 'Sơ đồ bàn';
   };
 
   return (
     <div className="flex flex-col lg:flex-row h-[100dvh] w-full bg-slate-50 font-sans text-slate-800 overflow-hidden">
-      
+
       {/* ══ CỘT TRÁI 70% ══ */}
       <div className="flex flex-col flex-1 min-w-0 lg:w-[70%] lg:border-r border-slate-200">
         {/* Top bar */}
@@ -404,7 +522,7 @@ export default function ServingPage() {
               </div>
             </div>
           </div>
-          
+
           {showMenu && (
             <div className="flex-1 flex gap-3 min-w-[300px]">
               <div className="relative flex-1 max-w-[280px]">
@@ -473,8 +591,8 @@ export default function ServingPage() {
             menuItems.length === 0
               ? <div className="text-center py-24 flex flex-col items-center justify-center"><div className="text-7xl opacity-20 mb-5 grayscale">☕</div><p className="text-slate-500 font-bold text-xl">Không tìm thấy món nào</p></div>
               : <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
-                  {menuItems.map(p => <ProductCard key={p._id} product={p} onAdd={addToCart} />)}
-                </div>
+                {menuItems.map(p => <ProductCard key={p._id} product={p} onAdd={addToCart} />)}
+              </div>
           )}
         </div>
       </div>
@@ -495,7 +613,7 @@ export default function ServingPage() {
             )}
           </div>
           {showInvoice && existingOrder && (
-             <span className="text-sm font-bold font-mono text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">#{existingOrder.orderCode}</span>
+            <span className="text-sm font-bold font-mono text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-100">#{existingOrder.orderCode}</span>
           )}
         </div>
 
@@ -511,33 +629,33 @@ export default function ServingPage() {
           {selectedTable && showMenu && (
             cart.length === 0
               ? <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-slate-400">
-                  <div className="w-24 h-24 bg-slate-100 border-2 border-dashed border-slate-300 rounded-full flex items-center justify-center text-4xl mb-4 grayscale opacity-50">🍽</div>
-                  <p className="font-bold text-slate-500 text-lg">Giỏ hàng trống</p>
-                  <p className="text-sm mt-2 text-slate-400 max-w-[200px]">Chọn món ở menu để thêm vào đơn.</p>
-                </div>
+                <div className="w-24 h-24 bg-slate-100 border-2 border-dashed border-slate-300 rounded-full flex items-center justify-center text-4xl mb-4 grayscale opacity-50">🍽</div>
+                <p className="font-bold text-slate-500 text-lg">Giỏ hàng trống</p>
+                <p className="text-sm mt-2 text-slate-400 max-w-[200px]">Chọn món ở menu để thêm vào đơn.</p>
+              </div>
               : <div className="animate-in slide-in-from-bottom-2 duration-300">
-                  {cart.map(item => <OrderLine key={item.key} item={item} onQty={changeQty} onRemove={removeItem} onEdit={setEditingNoteItem} />)}
-                </div>
+                {cart.map(item => <OrderLine key={item.key} item={item} onQty={changeQty} onRemove={removeItem} onEdit={setEditingNoteItem} />)}
+              </div>
           )}
           {selectedTable && showInvoice && (
             loadingOrder
               ? <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
-                  <div className="w-10 h-10 border-4 border-slate-200 border-t-indigo-500 rounded-full animate-spin"></div>
-                  <p className="font-bold">Đang tải hóa đơn...</p>
-                </div>
+                <div className="w-10 h-10 border-4 border-slate-200 border-t-indigo-500 rounded-full animate-spin"></div>
+                <p className="font-bold">Đang tải hóa đơn...</p>
+              </div>
               : existingOrder
                 ? <div className="animate-in fade-in duration-300">
-                    <div className="mb-5 flex justify-center">
-                      <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border-2
-                        ${existingOrder.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-sm shadow-amber-100' : 
-                          existingOrder.status === 'ready' ? 'bg-green-50 text-green-600 border-green-200 shadow-sm shadow-green-100' :
+                  <div className="mb-5 flex justify-center">
+                    <span className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold border-2
+                        ${existingOrder.status === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-sm shadow-amber-100' :
+                        existingOrder.status === 'ready' ? 'bg-green-50 text-green-600 border-green-200 shadow-sm shadow-green-100' :
                           'bg-indigo-50 text-indigo-600 border-indigo-200 shadow-sm shadow-indigo-100'}`}>
-                        <span className={`w-2 h-2 rounded-full ${existingOrder.status === 'pending' ? 'bg-amber-500 animate-pulse' : existingOrder.status === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-indigo-500'}`} />
-                        {{ pending:'Chờ nhà bếp xác nhận', confirmed:'Nhà bếp đã nhận', preparing:'Đang pha chế', ready:'Sẵn sàng phục vụ', served:'Đã phục vụ', paid:'Đã thanh toán' }[existingOrder.status] || existingOrder.status}
-                      </span>
-                    </div>
-                    {existingOrder.items?.map((item, i) => <InvoiceLine key={i} item={item} />)}
+                      <span className={`w-2 h-2 rounded-full ${existingOrder.status === 'pending' ? 'bg-amber-500 animate-pulse' : existingOrder.status === 'ready' ? 'bg-green-500 animate-pulse' : 'bg-indigo-500'}`} />
+                      {{ pending: 'Chờ nhà bếp xác nhận', confirmed: 'Nhà bếp đã nhận', preparing: 'Đang pha chế', ready: 'Sẵn sàng phục vụ', served: 'Đã phục vụ', paid: 'Đã thanh toán' }[existingOrder.status] || existingOrder.status}
+                    </span>
                   </div>
+                  {existingOrder.items?.map((item, i) => <InvoiceLine key={item._id || i} item={item} onToggle={handleToggleItemStatus} />)}
+                </div>
                 : <div className="text-center py-10 font-bold text-slate-400">Không tìm thấy đơn hàng</div>
           )}
         </div>
@@ -553,7 +671,7 @@ export default function ServingPage() {
             </div>
             <div className="text-right">
               <p className="text-sm font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
-                {showMenu ? `${cart.reduce((s,i) => s+i.quantity, 0)} sản phẩm` : existingOrder ? `${existingOrder.items?.reduce((s,i) => s+i.quantity,0)||0} sản phẩm` : '0 sản phẩm'}
+                {showMenu ? `${cart.reduce((s, i) => s + i.quantity, 0)} sản phẩm` : existingOrder ? `${existingOrder.items?.reduce((s, i) => s + i.quantity, 0) || 0} sản phẩm` : '0 sản phẩm'}
               </p>
             </div>
           </div>
@@ -568,7 +686,7 @@ export default function ServingPage() {
                 {saving ? (
                   <><div className="w-6 h-6 border-4 border-white/50 border-t-white rounded-full animate-spin" /> Đang xử lý...</>
                 ) : (
-                  mode === 'add-items' ? '✓ Cập nhật đơn' : '✓ Gửi nhà bếp'
+                  mode === 'add-items' ? '✓ Cập nhật đơn' : 'Xác nhận đơn hàng'
                 )}
               </button>
               {mode === 'add-items' && (
@@ -588,17 +706,11 @@ export default function ServingPage() {
               </button>
 
               <button
-                onClick={handlePayment}
+                onClick={() => setShowPaymentConfirm(true)}
                 disabled={!existingOrder || saving}
                 className={`w-full py-4 rounded-2xl font-black text-lg flex items-center justify-center gap-2 transition-all
                   ${existingOrder && !saving ? 'bg-slate-800 hover:bg-slate-900 text-white shadow-xl shadow-slate-800/20 hover:-translate-y-1' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}>
-                {saving ? (
-                   <><div className="w-5 h-5 border-4 border-white/50 border-t-white rounded-full animate-spin" /> Đang xử lý...</>
-                ) : existingOrder ? (
-                  `💰 Thanh toán`
-                ) : (
-                  'Thanh toán'
-                )}
+                💰 Thanh toán
               </button>
             </div>
           )}
@@ -606,7 +718,7 @@ export default function ServingPage() {
       </div>
 
       {editingNoteItem && <NoteModal item={editingNoteItem} onClose={() => setEditingNoteItem(null)} onSave={saveNote} />}
-      {success && <SuccessOverlay order={success} onClose={() => setSuccess(null)} />}
+      {showPaymentConfirm && <PaymentConfirmModal order={existingOrder} table={selectedTable} saving={saving} onClose={() => setShowPaymentConfirm(false)} onConfirm={handlePayment} />}
     </div>
   );
 }

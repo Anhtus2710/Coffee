@@ -45,7 +45,7 @@ function ItemRow({ item, idx, onMarkReady, updating }) {
 
       {/* Tên món */}
       <td style={{ padding: '14px 16px' }}>
-        <div style={{ fontWeight: 700, fontSize: '.9375rem', color: '#1e293b' }}>
+        <div style={{ fontWeight: 700, fontSize: '.9375rem', color: isReady ? '#10b981' : '#1e293b' }}>
           {item.name}
           {item.size && item.size !== 'default' && (
             <span style={{ fontWeight: 500, color: '#94a3b8', fontSize: '.8125rem', marginLeft: 6 }}>({item.size})</span>
@@ -201,7 +201,13 @@ export default function PreparingPage() {
   /* ── flatten items từ orders ── */
   const flatItems = allOrders.flatMap(order =>
     order.items.map(item => ({ ...item, orderId: order._id, orderCode: order.orderCode, tableNumber: order.tableNumber, createdAt: order.createdAt }))
-  );
+  ).sort((a, b) => {
+    // So sánh theo ObjectId (mới nhất lên trên) vì ObjectId chứa thời gian tạo thực tế của từng món
+    if (a._id && b._id) {
+      return b._id.toString().localeCompare(a._id.toString());
+    }
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
 
   const itemsPreparing = flatItems.filter(i => ['pending','preparing'].includes(i.status));
   const itemsReady     = flatItems.filter(i => i.status === 'ready');

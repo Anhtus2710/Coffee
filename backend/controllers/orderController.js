@@ -195,12 +195,25 @@ exports.addItems = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Không thể thêm món vào đơn hàng đã đóng' });
     }
 
-    const newItems = req.body.items.map(item => ({
-      ...item,
-      status: 'pending',
-    }));
+    req.body.items.forEach(newItem => {
+      // Tìm món trùng khớp (cùng product, size, note) bất kể trạng thái hiện tại
+      const existingItem = order.items.find(item => 
+        item.product.toString() === newItem.product.toString() &&
+        item.size === newItem.size &&
+        (item.note || '') === (newItem.note || '')
+      );
 
-    order.items.push(...newItems);
+      if (existingItem) {
+        existingItem.quantity += newItem.quantity;
+        // Chuyển lại trạng thái thành pending để nhà bếp làm thêm
+        existingItem.status = 'pending';
+      } else {
+        order.items.push({
+          ...newItem,
+          status: 'pending',
+        });
+      }
+    });
 
     // Recalculate subtotal and total
     order.subtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
